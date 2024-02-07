@@ -3,7 +3,7 @@ module github.com/Layr-Labs/avs-sync
 go 1.21.2
 
 require (
-	github.com/Layr-Labs/eigensdk-go v0.0.10-0.20240121052628-2db70d4dfb61
+	github.com/Layr-Labs/eigensdk-go v0.1.1-0.20240207213853-8a666597e0f1
 	github.com/ethereum/go-ethereum v1.13.11
 	github.com/testcontainers/testcontainers-go v0.26.0
 	github.com/urfave/cli v1.22.14
@@ -39,7 +39,7 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/google/uuid v1.5.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/holiman/uint256 v1.2.4 // indirect
 	github.com/klauspost/compress v1.16.0 // indirect
