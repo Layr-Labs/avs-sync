@@ -1,0 +1,25 @@
+name: unit-tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  Test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      # needed otherwise the foundry image is not found
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+      - name: Test
+        run: make test
