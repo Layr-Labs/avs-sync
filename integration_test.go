@@ -380,7 +380,7 @@ func registerOperatorWithAvs(ethHttpUrl string, contractAddresses ContractAddres
 	}
 	sigValidForSeconds := int64(1_000_000)
 	operatorToAvsRegistrationSigExpiry := big.NewInt(int64(curBlock.Time()) + sigValidForSeconds)
-	_, err = avsWriter.RegisterOperatorWithAVSRegistryCoordinator(
+	_, err = avsWriter.RegisterOperatorInQuorumWithAVSRegistryCoordinator(
 		context.Background(),
 		ecdsaPrivKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry,
 		blsKeyPair, quorumNumbers, socket,
