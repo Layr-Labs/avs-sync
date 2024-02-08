@@ -64,11 +64,17 @@ var (
 		Usage:  "If set to true, will fetch the list of quorums registered in the contract and update all of them",
 		EnvVar: envVarPrefix + "FETCH_QUORUMS_DYNAMICALLY",
 	}
-	RpcTimeoutDurationFlag = cli.DurationFlag{
-		Name:   "rpc-timeout-duration",
-		Usage:  "Timeout duration for rpc calls in `SECONDS`",
+	ReaderTimeoutDurationFlag = cli.DurationFlag{
+		Name:   "reader-timeout-duration",
+		Usage:  "Timeout duration for rpc calls to read from chain in `SECONDS`",
 		Value:  5 * time.Second,
-		EnvVar: envVarPrefix + "RPC_TIMEOUT_DURATION",
+		EnvVar: envVarPrefix + "READER_TIMEOUT_DURATION",
+	}
+	WriterTimeoutDurationFlag = cli.DurationFlag{
+		Name:   "writer-timeout-duration",
+		Usage:  "Timeout duration for transactions to be confirmed in `SECONDS`",
+		Value:  90 * time.Second,
+		EnvVar: envVarPrefix + "WRITER_TIMEOUT_DURATION",
 	}
 	retrySyncNTimes = cli.IntFlag{
 		Name:   "retry-sync-n-times",
@@ -91,7 +97,8 @@ var OptionalFlags = []cli.Flag{
 	OperatorListFlag,
 	QuorumListFlag,
 	FetchQuorumDynamicallyFlag,
-	RpcTimeoutDurationFlag,
+	ReaderTimeoutDurationFlag,
+	WriterTimeoutDurationFlag,
 	retrySyncNTimes,
 }
 

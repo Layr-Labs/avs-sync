@@ -259,6 +259,7 @@ func NewTestAvsSync(anvilHttpEndpoint string, contractAddresses ContractAddresse
 		false,
 		1, // 1 retry
 		5*time.Second,
+		5*time.Second,
 	)
 	return avsSync
 }
