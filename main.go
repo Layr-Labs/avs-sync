@@ -108,7 +108,8 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		quorums,
 		cliCtx.Bool(FetchQuorumDynamicallyFlag.Name),
 		cliCtx.Int(retrySyncNTimes.Name),
-		cliCtx.Duration(RpcTimeoutDurationFlag.Name),
+		cliCtx.Duration(ReaderTimeoutDurationFlag.Name),
+		cliCtx.Duration(WriterTimeoutDurationFlag.Name),
 	)
 	avsSync.Start()
 

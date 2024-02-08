@@ -23,7 +23,8 @@ type AvsSync struct {
 	fetchQuorumsDynamically      bool
 	retrySyncNTimes              int
 
-	rpcTimeoutDuration time.Duration
+	readerTimeoutDuration time.Duration
+	writerTimeoutDuration time.Duration
 }
 
 // NewAvsSync creates a new AvsSync object
@@ -36,7 +37,8 @@ func NewAvsSync(
 	avsReader avsregistry.AvsRegistryReader, avsWriter avsregistry.AvsRegistryWriter,
 	sleepBeforeFirstSyncDuration time.Duration, syncInterval time.Duration, operators []common.Address,
 	quorums []byte, fetchQuorumsDynamically bool, retrySyncNTimes int,
-	rpcTimeoutDuration time.Duration,
+	readerTimeoutDuration time.Duration,
+	writerTimeoutDuration time.Duration,
 ) *AvsSync {
 	return &AvsSync{
 		logger:                       logger,
@@ -48,13 +50,14 @@ func NewAvsSync(
 		quorums:                      quorums,
 		fetchQuorumsDynamically:      fetchQuorumsDynamically,
 		retrySyncNTimes:              retrySyncNTimes,
-		rpcTimeoutDuration:           rpcTimeoutDuration,
+		readerTimeoutDuration:        readerTimeoutDuration,
+		writerTimeoutDuration:        writerTimeoutDuration,
 	}
 }
 
 func (a *AvsSync) Start() {
-	a.logger.Infof("Starting avs sync with sleepBeforeFirstSyncDuration=%s, syncInterval=%s, operators=%v, quorums=%v, fetchQuorumsDynamically=%v, rpcTimeoutDuration=%s",
-		a.sleepBeforeFirstSyncDuration, a.syncInterval, a.operators, a.quorums, a.fetchQuorumsDynamically, a.rpcTimeoutDuration)
+	a.logger.Infof("Starting avs sync with sleepBeforeFirstSyncDuration=%s, syncInterval=%s, operators=%v, quorums=%v, fetchQuorumsDynamically=%v, readerTimeoutDuration=%s, writerTimeoutDuration=%s",
+		a.sleepBeforeFirstSyncDuration, a.syncInterval, a.operators, a.quorums, a.fetchQuorumsDynamically, a.readerTimeoutDuration, a.writerTimeoutDuration)
 
 	// run something every syncInterval
 	ticker := time.NewTicker(a.syncInterval)
@@ -94,7 +97,7 @@ func (a *AvsSync) updateStakes() error {
 		return nil
 	} else {
 		a.logger.Infof("Updating stakes of operators: %v", a.operators)
-		timeoutCtx, cancel := context.WithTimeout(context.Background(), a.rpcTimeoutDuration)
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), a.writerTimeoutDuration)
 		defer cancel()
 		// this one we update all quorums at once, since we're only updating a subset of operators (which should be a small number)
 		_, err := a.avsWriter.UpdateStakesOfOperatorSubsetForAllQuorums(timeoutCtx, a.operators)
@@ -110,7 +113,7 @@ func (a *AvsSync) maybeUpdateQuorumSet() {
 		return
 	}
 	a.logger.Info("Fetching quorum set dynamically")
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), a.rpcTimeoutDuration)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), a.readerTimeoutDuration)
 	defer cancel()
 	quorumCount, err := a.avsReader.GetQuorumCount(&bind.CallOpts{Context: timeoutCtx})
 	if err != nil {
@@ -129,7 +132,7 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 	for i := 0; i < retryNTimes; i++ {
 		a.logger.Debug("tryNTimesUpdateStakesOfEntireOperatorSetForQuorum", "quorum", quorum, "retryNTimes", retryNTimes, "try", i+1)
 
-		timeoutCtx, cancel := context.WithTimeout(context.Background(), a.rpcTimeoutDuration)
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), a.readerTimeoutDuration)
 		defer cancel()
 		operatorAddrsPerQuorum, err := a.avsReader.GetOperatorAddrsInQuorumsAtCurrentBlock(&bind.CallOpts{Context: timeoutCtx}, []byte{quorum})
 		if err != nil {
@@ -142,7 +145,7 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 			return operators[i].Big().Cmp(operators[j].Big()) < 0
 		})
 		a.logger.Infof("Updating stakes of operators in quorum %d: %v", quorum, operators)
-		timeoutCtx, cancel = context.WithTimeout(context.Background(), a.rpcTimeoutDuration)
+		timeoutCtx, cancel = context.WithTimeout(context.Background(), a.writerTimeoutDuration)
 		defer cancel()
 		_, err = a.avsWriter.UpdateStakesOfEntireOperatorSetForQuorums(timeoutCtx, [][]common.Address{operators}, []byte{quorum})
 		if err != nil {
