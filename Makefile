@@ -8,7 +8,7 @@ start-anvil-goerli-fork: ##
 	anvil --fork-url https://goerli.gateway.tenderly.co
 
 run-avs-sync: ## 
-	./start.sh
+	./run.sh
 
 test: ## 
 	go test ./...
