@@ -111,7 +111,7 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		cliCtx.Duration(ReaderTimeoutDurationFlag.Name),
 		cliCtx.Duration(WriterTimeoutDurationFlag.Name),
 	)
-	avsSync.Start()
 
+	avsSync.Start()
 	return nil
 }
