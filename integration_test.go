@@ -61,7 +61,7 @@ func TestIntegrationUpdateSingleOperatorPath(t *testing.T) {
 	}
 	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivKey.PublicKey)
 	operatorBlsPrivKey := "0x1"
-	avsSync := NewTestAvsSync(anvilHttpEndpoint, contractAddresses, []common.Address{operatorAddr})
+	avsSync := NewTestAvsSync(anvilHttpEndpoint, contractAddresses, []common.Address{operatorAddr}, 30*time.Second)
 
 	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
 	registerOperatorWithAvs(anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
@@ -117,7 +117,7 @@ func TestIntegrationFullOperatorSet(t *testing.T) {
 	}
 	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivKey.PublicKey)
 	operatorBlsPrivKey := "0x1"
-	avsSync := NewTestAvsSync(anvilHttpEndpoint, contractAddresses, []common.Address{})
+	avsSync := NewTestAvsSync(anvilHttpEndpoint, contractAddresses, []common.Address{}, 30*time.Second)
 
 	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
 	registerOperatorWithAvs(anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
@@ -179,7 +179,7 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 
 	// we create avs sync and replace its avsWriter with a mock that will fail the first 2 times we call UpdateStakesOfEntireOperatorSetForQuorums
 	// and succeed on the third time
-	avsSync := NewTestAvsSync(anvilHttpEndpoint, contractAddresses, []common.Address{})
+	avsSync := NewTestAvsSync(anvilHttpEndpoint, contractAddresses, []common.Address{}, 30*time.Second)
 	mockCtrl := gomock.NewController(t)
 	mockAvsRegistryWriter := chainiomocks.NewMockAvsRegistryWriter(mockCtrl)
 	// this is the test. we just make sure this is called 3 times
@@ -194,7 +194,59 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 
 }
 
-func NewTestAvsSync(anvilHttpEndpoint string, contractAddresses ContractAddresses, operators []common.Address) *AvsSync {
+func TestSingleRun(t *testing.T) {
+	/* Start the anvil chain */
+	anvilC := startAnvilTestContainer()
+	// Not sure why but deferring anvilC.Terminate() causes a panic when the test finishes...
+	// so letting it terminate silently for now
+	anvilHttpEndpoint, err := anvilC.Endpoint(context.Background(), "http")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	contractAddresses := getContractAddressesFromContractRegistry(anvilHttpEndpoint)
+	operatorEcdsaPrivKeyHex := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+	operatorEcdsaPrivKey, err := crypto.HexToECDSA(operatorEcdsaPrivKeyHex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivKey.PublicKey)
+	operatorBlsPrivKey := "0x1"
+	// set sync interval to 0 so that we only run once
+	avsSync := NewTestAvsSync(anvilHttpEndpoint, contractAddresses, []common.Address{}, 0)
+
+	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
+	registerOperatorWithAvs(anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
+
+	// get stake of operator before sync
+	operatorsPerQuorumBeforeSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []byte{0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// TODO: should be checking all operators, not just the first one
+	operatorStakeBeforeSync := operatorsPerQuorumBeforeSync[0][0].Stake
+
+	// deposit into strategy to create a diff between eigenlayer and avs stakes
+	depositAmount := big.NewInt(100)
+	depositErc20IntoStrategyForOperator(anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
+
+	avsSync.Start()
+
+	// get stake of operator after sync
+	operatorsPerQuorumAfterSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []byte{0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	operatorStakeAfterSync := operatorsPerQuorumAfterSync[0][0].Stake
+	operatorStakeDiff := new(big.Int).Sub(operatorStakeAfterSync, operatorStakeBeforeSync)
+
+	// we just check that the diff is equal to the deposited amount
+	if operatorStakeDiff.Cmp(depositAmount) != 0 {
+		t.Errorf("expected operator stake diff to be equal to deposit amount, got %v", operatorStakeDiff)
+	}
+}
+
+func NewTestAvsSync(anvilHttpEndpoint string, contractAddresses ContractAddresses, operators []common.Address, syncInterval time.Duration) *AvsSync {
 	logger, err := logging.NewZapLogger(logging.Development)
 	if err != nil {
 		panic(err)
@@ -252,7 +304,7 @@ func NewTestAvsSync(anvilHttpEndpoint string, contractAddresses ContractAddresse
 		avsReader,
 		avsWriter,
 		0*time.Second,
-		30*time.Second,
+		syncInterval,
 		operators,
 		// we only test with one quorum
 		[]byte{0},

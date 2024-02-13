@@ -59,10 +59,6 @@ func (a *AvsSync) Start() {
 	a.logger.Infof("Starting avs sync with sleepBeforeFirstSyncDuration=%s, syncInterval=%s, operators=%v, quorums=%v, fetchQuorumsDynamically=%v, readerTimeoutDuration=%s, writerTimeoutDuration=%s",
 		a.sleepBeforeFirstSyncDuration, a.syncInterval, a.operators, a.quorums, a.fetchQuorumsDynamically, a.readerTimeoutDuration, a.writerTimeoutDuration)
 
-	// run something every syncInterval
-	ticker := time.NewTicker(a.syncInterval)
-	defer ticker.Stop()
-
 	// ticker doesn't tick immediately, so we send a first updateStakes here
 	// see https://github.com/golang/go/issues/17601
 	// we first sleep some amount of time before the first sync, which allows the syncs to happen at some preferred time
@@ -72,6 +68,15 @@ func (a *AvsSync) Start() {
 	if err != nil {
 		a.logger.Error("Error updating stakes", err)
 	}
+
+	if a.syncInterval == 0 {
+		a.logger.Infof("Sync interval is 0, running updateStakes once and exiting")
+		return // only run once
+	}
+
+	// update stakes every syncInterval
+	ticker := time.NewTicker(a.syncInterval)
+	defer ticker.Stop()
 
 	for range ticker.C {
 		err := a.updateStakes()

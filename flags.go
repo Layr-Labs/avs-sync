@@ -37,7 +37,7 @@ var (
 	SyncIntervalFlag = cli.DurationFlag{
 		Name:     "sync-interval",
 		Required: true,
-		Usage:    "call updateStakes function at every `TIME` interval",
+		Usage:    "Interval at which to sync with the chain (e.g. 24h). If set to 0, will only sync once and then exit.",
 		Value:    24 * time.Hour,
 		EnvVar:   envVarPrefix + "SYNC_INTERVAL",
 	}
