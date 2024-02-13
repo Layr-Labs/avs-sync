@@ -57,7 +57,7 @@ func NewAvsSync(
 
 func (a *AvsSync) Start() {
 	a.logger.Infof("Starting avs sync with sleepBeforeFirstSyncDuration=%s, syncInterval=%s, operators=%v, quorums=%v, fetchQuorumsDynamically=%v, readerTimeoutDuration=%s, writerTimeoutDuration=%s",
-		a.sleepBeforeFirstSyncDuration, a.syncInterval, a.operators, a.quorums, a.fetchQuorumsDynamically, a.readerTimeoutDuration, a.writerTimeoutDuration)
+		a.sleepBeforeFirstSyncDuration, a.syncInterval, a.operators, convertQuorumsBytesToInts(a.quorums), a.fetchQuorumsDynamically, a.readerTimeoutDuration, a.writerTimeoutDuration)
 
 	// ticker doesn't tick immediately, so we send a first updateStakes here
 	// see https://github.com/golang/go/issues/17601
@@ -91,7 +91,7 @@ func (a *AvsSync) updateStakes() error {
 	if len(a.operators) == 0 {
 		a.logger.Info("Updating stakes of entire operator set")
 		a.maybeUpdateQuorumSet()
-		a.logger.Infof("Current quorum set: %v", a.quorums)
+		a.logger.Infof("Current quorum set: %v", convertQuorumsBytesToInts(a.quorums))
 
 		// we update one quorum at a time, just to make sure we don't run into any gas limit issues
 		// in case there are a lot of operators in a given quorum
@@ -135,7 +135,7 @@ func (a *AvsSync) maybeUpdateQuorumSet() {
 
 func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte, retryNTimes int) {
 	for i := 0; i < retryNTimes; i++ {
-		a.logger.Debug("tryNTimesUpdateStakesOfEntireOperatorSetForQuorum", "quorum", quorum, "retryNTimes", retryNTimes, "try", i+1)
+		a.logger.Debug("tryNTimesUpdateStakesOfEntireOperatorSetForQuorum", "quorum", int(quorum), "retryNTimes", retryNTimes, "try", i+1)
 
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), a.readerTimeoutDuration)
 		defer cancel()
@@ -149,15 +149,23 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 		sort.Slice(operators, func(i, j int) bool {
 			return operators[i].Big().Cmp(operators[j].Big()) < 0
 		})
-		a.logger.Infof("Updating stakes of operators in quorum %d: %v", quorum, operators)
+		a.logger.Infof("Updating stakes of operators in quorum %d: %v", int(quorum), operators)
 		timeoutCtx, cancel = context.WithTimeout(context.Background(), a.writerTimeoutDuration)
 		defer cancel()
 		_, err = a.avsWriter.UpdateStakesOfEntireOperatorSetForQuorums(timeoutCtx, [][]common.Address{operators}, []byte{quorum})
 		if err != nil {
-			a.logger.Error("Error updating stakes of entire operator set for quorum", "err", err, "quorum", quorum)
+			a.logger.Error("Error updating stakes of entire operator set for quorum", "err", err, "quorum", int(quorum))
 			continue
 		}
 		return
 	}
 	a.logger.Error("Giving up after retrying", "retryNTimes", retryNTimes)
+}
+
+func convertQuorumsBytesToInts(quorums []byte) []int {
+	var quorumsInts []int
+	for _, quorum := range quorums {
+		quorumsInts = append(quorumsInts, int(quorum))
+	}
+	return quorumsInts
 }
