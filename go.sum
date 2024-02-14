@@ -8,8 +8,6 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/toml v1.3.2/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/DataDog/zstd v1.4.5 h1:EndNeuB0l9syBZhut0wns3gV1hL8zX8LIu6ZiVHWLIQ=
 github.com/DataDog/zstd v1.4.5/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
-github.com/Layr-Labs/eigensdk-go v0.1.1-0.20240207213853-8a666597e0f1 h1:OKkL+wllNIELDSgYr6mJQZKZ/H7lH40Szk6ZpdQmjLE=
-github.com/Layr-Labs/eigensdk-go v0.1.1-0.20240207213853-8a666597e0f1/go.mod h1:H+IrmttU+eytGEblC7J9gmvBV425UcPPvEVO4JkHALE=
 github.com/Layr-Labs/eigensdk-go v0.1.1 h1:AjUoieoAtaGxuxOHj6nB2xxuBTrghlYJl3AguICI9kc=
 github.com/Layr-Labs/eigensdk-go v0.1.1/go.mod h1:c/yA0hmP2pJILySQLerQnDPcJ5Z3mtyH0hhjQGw3Xrc=
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=

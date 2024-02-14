@@ -481,6 +481,7 @@ func depositErc20IntoStrategyForOperator(
 	txMgr := txmgr.NewSimpleTxManager(ethHttpClient, logger, signerFn, ecdsaAddr)
 	elWriter, err := elcontracts.BuildELChainWriter(
 		delegationManagerAddr,
+		common.Address{}, // avsDirectory not needed so we just pass an empty address
 		ethHttpClient,
 		logger,
 		noopMetrics,
