@@ -20,7 +20,7 @@ type AvsSync struct {
 	syncInterval                 time.Duration
 	operators                    []common.Address // empty means we update all operators
 	quorums                      []byte
-	noFetchQuorumsDynamically    bool
+	fetchQuorumsDynamically      bool
 	retrySyncNTimes              int
 
 	readerTimeoutDuration time.Duration
@@ -36,7 +36,7 @@ func NewAvsSync(
 	logger sdklogging.Logger,
 	avsReader avsregistry.AvsRegistryReader, avsWriter avsregistry.AvsRegistryWriter,
 	sleepBeforeFirstSyncDuration time.Duration, syncInterval time.Duration, operators []common.Address,
-	quorums []byte, noFetchQuorumsDynamically bool, retrySyncNTimes int,
+	quorums []byte, fetchQuorumsDynamically bool, retrySyncNTimes int,
 	readerTimeoutDuration time.Duration,
 	writerTimeoutDuration time.Duration,
 ) *AvsSync {
@@ -48,7 +48,7 @@ func NewAvsSync(
 		syncInterval:                 syncInterval,
 		operators:                    operators,
 		quorums:                      quorums,
-		noFetchQuorumsDynamically:    noFetchQuorumsDynamically,
+		fetchQuorumsDynamically:      fetchQuorumsDynamically,
 		retrySyncNTimes:              retrySyncNTimes,
 		readerTimeoutDuration:        readerTimeoutDuration,
 		writerTimeoutDuration:        writerTimeoutDuration,
@@ -63,7 +63,7 @@ func (a *AvsSync) Start() {
 		"syncInterval", a.syncInterval,
 		"operators", a.operators,
 		"quorums", a.quorums,
-		"noFetchQuorumsDynamically", a.noFetchQuorumsDynamically,
+		"fetchQuorumsDynamically", a.fetchQuorumsDynamically,
 		"readerTimeoutDuration", a.readerTimeoutDuration,
 		"writerTimeoutDuration", a.writerTimeoutDuration,
 	)
@@ -123,7 +123,7 @@ func (a *AvsSync) updateStakes() error {
 }
 
 func (a *AvsSync) maybeUpdateQuorumSet() {
-	if a.noFetchQuorumsDynamically {
+	if !a.fetchQuorumsDynamically {
 		return
 	}
 	a.logger.Info("Fetching quorum set dynamically")

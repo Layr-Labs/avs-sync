@@ -58,9 +58,9 @@ var (
 		Usage:  "List of quorums to update stakes for (only needs to be present if operators list not present and fetch-quorums-dynamically is false)",
 		EnvVar: envVarPrefix + "QUORUMS",
 	}
-	NoFetchQuorumDynamicallyFlag = cli.BoolFlag{
+	FetchQuorumDynamicallyFlag = cli.BoolTFlag{
 		Name:   "fetch-quorums-dynamically",
-		Usage:  "If set to true, will use the quorumList argument instead of fetching the list of quorums registered in the contract dynamically and updating all of them",
+		Usage:  "If set to true (default), will fetch the list of quorums registered in the contract and update all of them",
 		EnvVar: envVarPrefix + "FETCH_QUORUMS_DYNAMICALLY",
 	}
 	ReaderTimeoutDurationFlag = cli.DurationFlag{
@@ -95,7 +95,7 @@ var OptionalFlags = []cli.Flag{
 	FirstSyncTimeFlag,
 	OperatorListFlag,
 	QuorumListFlag,
-	NoFetchQuorumDynamicallyFlag,
+	FetchQuorumDynamicallyFlag,
 	ReaderTimeoutDurationFlag,
 	WriterTimeoutDurationFlag,
 	retrySyncNTimes,

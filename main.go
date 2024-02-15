@@ -125,7 +125,7 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		cliCtx.Duration(SyncIntervalFlag.Name),
 		operators,
 		quorums,
-		cliCtx.Bool(NoFetchQuorumDynamicallyFlag.Name),
+		cliCtx.Bool(FetchQuorumDynamicallyFlag.Name),
 		cliCtx.Int(retrySyncNTimes.Name),
 		cliCtx.Duration(ReaderTimeoutDurationFlag.Name),
 		cliCtx.Duration(WriterTimeoutDurationFlag.Name),
