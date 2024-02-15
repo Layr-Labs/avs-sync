@@ -7,7 +7,7 @@ require (
 	github.com/ethereum/go-ethereum v1.13.12
 	github.com/testcontainers/testcontainers-go v0.26.0
 	github.com/urfave/cli v1.22.14
-	go.uber.org/mock v0.3.0
+	go.uber.org/mock v0.4.0
 )
 
 require (
