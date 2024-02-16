@@ -98,11 +98,30 @@ func avsSyncMain(cliCtx *cli.Context) error {
 	for _, quorum := range cliCtx.IntSlice(QuorumListFlag.Name) {
 		quorums = append(quorums, byte(quorum))
 	}
+
+	firstSyncTimeStr := cliCtx.String(FirstSyncTimeFlag.Name)
+	var sleepBeforeFirstSyncDuration time.Duration
+	if firstSyncTimeStr == "" {
+		sleepBeforeFirstSyncDuration = 0 * time.Second
+	} else {
+		now := time.Now()
+		firstSyncTime, err := time.Parse(time.TimeOnly, firstSyncTimeStr)
+		firstSyncTime = time.Date(now.Year(), now.Month(), now.Day(), firstSyncTime.Hour(), firstSyncTime.Minute(), firstSyncTime.Second(), 0, now.Location())
+		if err != nil {
+			return err
+		}
+		if now.After(firstSyncTime) {
+			// If the set time is before the current time, add a day to the set time
+			firstSyncTime = firstSyncTime.Add(24 * time.Hour)
+		}
+		sleepBeforeFirstSyncDuration = firstSyncTime.Sub(now)
+	}
+	logger.Infof("Sleeping for %v before first sync, so that it happens at %v", sleepBeforeFirstSyncDuration, time.Now().Add(sleepBeforeFirstSyncDuration))
 	avsSync := NewAvsSync(
 		logger,
 		avsReader,
 		avsWriter,
-		cliCtx.Duration(SleepBeforeFirstSyncDurationFlag.Name),
+		sleepBeforeFirstSyncDuration,
 		cliCtx.Duration(SyncIntervalFlag.Name),
 		operators,
 		quorums,

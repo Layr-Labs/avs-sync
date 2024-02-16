@@ -4,11 +4,18 @@
 help:
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
+# Currently exporting the .env vars directly in the commands that need them
+# see for eg. the run-avs-sync command
+# Uncommenting the two lines below will export the .env vars for all commands
+# include .env
+# export
+
 start-anvil-goerli-fork: ## 
 	anvil --fork-url https://goerli.gateway.tenderly.co
 
 run-avs-sync: ## 
-	./start.sh
+	@# we export the env vars from .env file and then run the go program
+	@set -a; . .env; set +a; go run .
 
 test: ## 
 	go test ./...

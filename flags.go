@@ -42,12 +42,11 @@ var (
 		EnvVar:   envVarPrefix + "SYNC_INTERVAL",
 	}
 	/* Optional Flags */
-	SleepBeforeFirstSyncDurationFlag = cli.DurationFlag{
-		Name:     "sleep-before-first-sync-duration",
+	FirstSyncTimeFlag = cli.StringFlag{
+		Name:     "first-sync-time",
 		Required: false,
-		Value:    0,
-		Usage:    "sleep for `SECONDS` before first sync (default=0)",
-		EnvVar:   envVarPrefix + "SLEEP_BEFORE_FIRST_SYNC_DURATION",
+		Usage:    "Set the HH:MI:SS time at which to run the first sync update",
+		EnvVar:   envVarPrefix + "FIRST_SYNC_TIME",
 	}
 	OperatorListFlag = cli.StringSliceFlag{
 		Name:   "operators",
@@ -59,9 +58,9 @@ var (
 		Usage:  "List of quorums to update stakes for (only needs to be present if operators list not present and fetch-quorums-dynamically is false)",
 		EnvVar: envVarPrefix + "QUORUMS",
 	}
-	FetchQuorumDynamicallyFlag = cli.BoolFlag{
+	FetchQuorumDynamicallyFlag = cli.BoolTFlag{
 		Name:   "fetch-quorums-dynamically",
-		Usage:  "If set to true, will fetch the list of quorums registered in the contract and update all of them",
+		Usage:  "If set to true (default), will fetch the list of quorums registered in the contract and update all of them",
 		EnvVar: envVarPrefix + "FETCH_QUORUMS_DYNAMICALLY",
 	}
 	ReaderTimeoutDurationFlag = cli.DurationFlag{
@@ -93,7 +92,7 @@ var RequiredFlags = []cli.Flag{
 }
 
 var OptionalFlags = []cli.Flag{
-	SleepBeforeFirstSyncDurationFlag,
+	FirstSyncTimeFlag,
 	OperatorListFlag,
 	QuorumListFlag,
 	FetchQuorumDynamicallyFlag,

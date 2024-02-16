@@ -56,8 +56,17 @@ func NewAvsSync(
 }
 
 func (a *AvsSync) Start() {
-	a.logger.Infof("Starting avs sync with sleepBeforeFirstSyncDuration=%s, syncInterval=%s, operators=%v, quorums=%v, fetchQuorumsDynamically=%v, readerTimeoutDuration=%s, writerTimeoutDuration=%s",
-		a.sleepBeforeFirstSyncDuration, a.syncInterval, a.operators, convertQuorumsBytesToInts(a.quorums), a.fetchQuorumsDynamically, a.readerTimeoutDuration, a.writerTimeoutDuration)
+	// TODO: should prob put all of these in a config struct, to make sure we don't forget to print any of them
+	//       when we add new ones.
+	a.logger.Info("Avssync config",
+		"sleepBeforeFirstSyncDuration", a.sleepBeforeFirstSyncDuration,
+		"syncInterval", a.syncInterval,
+		"operators", a.operators,
+		"quorums", a.quorums,
+		"fetchQuorumsDynamically", a.fetchQuorumsDynamically,
+		"readerTimeoutDuration", a.readerTimeoutDuration,
+		"writerTimeoutDuration", a.writerTimeoutDuration,
+	)
 
 	// ticker doesn't tick immediately, so we send a first updateStakes here
 	// see https://github.com/golang/go/issues/17601
@@ -83,7 +92,7 @@ func (a *AvsSync) Start() {
 		if err != nil {
 			a.logger.Error("Error updating stakes", err)
 		}
-		a.logger.Infof("Sleeping for %s\n", a.syncInterval)
+		a.logger.Infof("Sleeping for %s", a.syncInterval)
 	}
 }
 
@@ -98,7 +107,7 @@ func (a *AvsSync) updateStakes() error {
 		for _, quorum := range a.quorums {
 			a.tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum, a.retrySyncNTimes)
 		}
-		a.logger.Info("Completed stake update successfully")
+		a.logger.Info("Completed stake update. Check logs to make sure every quorum update succeeded successfully.")
 		return nil
 	} else {
 		a.logger.Infof("Updating stakes of operators: %v", a.operators)
@@ -139,9 +148,11 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), a.readerTimeoutDuration)
 		defer cancel()
+		// we need to refetch the operator set because one reason for update stakes failing is that the operator set has changed
+		// in between us fetching it and trying to update it (the contract makes sure the entire operator set is updated and reverts if not)
 		operatorAddrsPerQuorum, err := a.avsReader.GetOperatorAddrsInQuorumsAtCurrentBlock(&bind.CallOpts{Context: timeoutCtx}, []byte{quorum})
 		if err != nil {
-			a.logger.Error("Error fetching operator addresses in quorums", "err", err)
+			a.logger.Error("Error fetching operator addresses in quorums", "err", err, "quorum", quorum, "retryNTimes", retryNTimes, "try", i+1)
 			continue
 		}
 		var operators []common.Address
