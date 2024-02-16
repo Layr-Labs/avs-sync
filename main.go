@@ -105,7 +105,7 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		sleepBeforeFirstSyncDuration = 0 * time.Second
 	} else {
 		now := time.Now()
-		firstSyncTime, err := time.Parse("15:04:05", firstSyncTimeStr)
+		firstSyncTime, err := time.Parse(time.TimeOnly, firstSyncTimeStr)
 		firstSyncTime = time.Date(now.Year(), now.Month(), now.Day(), firstSyncTime.Hour(), firstSyncTime.Minute(), firstSyncTime.Second(), 0, now.Location())
 		if err != nil {
 			return err
