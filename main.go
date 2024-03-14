@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/avsregistry"
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/eth"
+	"github.com/Layr-Labs/eigensdk-go/chainio/clients/fireblocks"
+	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/chainio/txmgr"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
@@ -38,36 +42,69 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		return err
 	}
 
-	operatorEcdsaPrivKeyHexStr := cliCtx.String(EcdsaPrivateKeyFlag.Name)
-	ecdsaPrivKey, err := crypto.HexToECDSA(operatorEcdsaPrivKeyHexStr)
-	if err != nil {
-		logger.Errorf("Cannot create ecdsa private key", "err", err)
-		return err
-	}
-	ecdsaAddr := crypto.PubkeyToAddress(ecdsaPrivKey.PublicKey)
-	logger.Debug("ECDSA Address", "address", ecdsaAddr.Hex())
+	writerTimeout := cliCtx.Duration(WriterTimeoutDurationFlag.Name)
+	readerTimeout := cliCtx.Duration(ReaderTimeoutDurationFlag.Name)
 
 	ethHttpClient, err := eth.NewClient(cliCtx.String(EthHttpUrlFlag.Name))
 	if err != nil {
 		logger.Fatalf("Cannot create eth client", "err", err)
 	}
 
-	rpcCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	rpcCtx, cancel := context.WithTimeout(context.Background(), readerTimeout)
 	defer cancel()
 	chainid, err := ethHttpClient.ChainID(rpcCtx)
 	if err != nil {
 		logger.Fatalf("Cannot get chain id", "err", err)
 	}
-	// confusing interface, see https://github.com/Layr-Labs/eigensdk-go/issues/90
-	signerFn, _, err := signerv2.SignerFromConfig(signerv2.Config{
-		PrivateKey: ecdsaPrivKey,
-	}, chainid)
-	if err != nil {
-		logger.Errorf("Cannot create signer", "err", err)
-		return err
+
+	var wallet walletsdk.Wallet
+	var sender common.Address
+	operatorEcdsaPrivKeyHexStr := cliCtx.String(EcdsaPrivateKeyFlag.Name)
+	if len(operatorEcdsaPrivKeyHexStr) > 0 {
+		ecdsaPrivKey, err := crypto.HexToECDSA(operatorEcdsaPrivKeyHexStr)
+		if err != nil {
+			return fmt.Errorf("Cannot create ecdsa private key: %w", err)
+		}
+
+		signerV2, address, err := signerv2.SignerFromConfig(signerv2.Config{PrivateKey: ecdsaPrivKey}, chainid)
+		if err != nil {
+			return err
+		}
+		wallet, err = walletsdk.NewPrivateKeyWallet(ethHttpClient, signerV2, address, logger)
+		if err != nil {
+			return err
+		}
+		sender = address
+	} else {
+		fbAPIKey := cliCtx.String(FireblocksAPIKeyFlag.Name)
+		fbSecret := cliCtx.String(FireblocksAPISecretFlag.Name)
+		fbBaseURL := cliCtx.String(FireblocksBaseURLFlag.Name)
+		fbVaultAccountName := cliCtx.String(FireblocksVaultAccountNameFlag.Name)
+
+		fireblocksClient, err := fireblocks.NewClient(
+			fbAPIKey,
+			[]byte(fbSecret),
+			fbBaseURL,
+			writerTimeout,
+			logger,
+		)
+		if err != nil {
+			return err
+		}
+		wallet, err = walletsdk.NewFireblocksWallet(fireblocksClient, ethHttpClient, fbVaultAccountName, logger)
+		if err != nil {
+			return err
+		}
+		// TODO: read this from wallet
+		// sender, err = wallet.SenderAddress()
+		sender = common.HexToAddress("0x0000000000000000000000000000000000000123")
 	}
 
-	txMgr := txmgr.NewSimpleTxManager(ethHttpClient, logger, signerFn, ecdsaAddr)
+	if wallet == nil {
+		return errors.New("no wallet is configured. Either Fireblocks or PrivateKey wallet should be configured")
+	}
+
+	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, sender)
 
 	avsWriter, err := avsregistry.BuildAvsRegistryChainWriter(
 		common.HexToAddress(cliCtx.String(RegistryCoordinatorAddrFlag.Name)),
@@ -127,8 +164,8 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		quorums,
 		cliCtx.Bool(FetchQuorumDynamicallyFlag.Name),
 		cliCtx.Int(retrySyncNTimes.Name),
-		cliCtx.Duration(ReaderTimeoutDurationFlag.Name),
-		cliCtx.Duration(WriterTimeoutDurationFlag.Name),
+		readerTimeout,
+		writerTimeout,
 	)
 
 	avsSync.Start()

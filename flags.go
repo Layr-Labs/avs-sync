@@ -10,12 +10,6 @@ var envVarPrefix = "AVS_SYNC_"
 
 var (
 	/* Required Flags */
-	EcdsaPrivateKeyFlag = cli.StringFlag{
-		Name:     "ecdsa-private-key",
-		Required: true,
-		Usage:    "Ethereum ecdsa private key",
-		EnvVar:   envVarPrefix + "ECDSA_PRIVATE_KEY",
-	}
 	RegistryCoordinatorAddrFlag = cli.StringFlag{
 		Name:     "registry-coordinator-addr",
 		Required: true,
@@ -81,10 +75,36 @@ var (
 		Value:  3,
 		EnvVar: envVarPrefix + "RETRY_SYNC_N_TIMES",
 	}
+	EcdsaPrivateKeyFlag = cli.StringFlag{
+		Name:   "ecdsa-private-key",
+		Usage:  "Ethereum ecdsa private key",
+		EnvVar: envVarPrefix + "ECDSA_PRIVATE_KEY",
+	}
+	// Fireblocks flags
+	FireblocksAPIKeyFlag = cli.StringFlag{
+		Name:   "fireblocks-api-key",
+		Usage:  "Fireblocks API Key",
+		EnvVar: envVarPrefix + "FIREBLOCKS_API_KEY",
+	}
+	FireblocksAPISecretFlag = cli.StringFlag{
+		Name:   "fireblocks-api-secret",
+		Usage:  "Fireblocks API Secret",
+		EnvVar: envVarPrefix + "FIREBLOCKS_API_SECRET",
+	}
+	FireblocksBaseURLFlag = cli.StringFlag{
+		Name:   "fireblocks-api-url",
+		Usage:  "Fireblocks API URL",
+		EnvVar: envVarPrefix + "FIREBLOCKS_API_URL",
+		Value:  "https://api.fireblocks.io",
+	}
+	FireblocksVaultAccountNameFlag = cli.StringFlag{
+		Name:   "fireblocks-vault-account-name",
+		Usage:  "Fireblocks Vault Account Name",
+		EnvVar: envVarPrefix + "FIREBLOCKS_VAULT_ACCOUNT_NAME",
+	}
 )
 
 var RequiredFlags = []cli.Flag{
-	EcdsaPrivateKeyFlag,
 	RegistryCoordinatorAddrFlag,
 	OperatorStateRetrieverAddrFlag,
 	EthHttpUrlFlag,
@@ -99,6 +119,11 @@ var OptionalFlags = []cli.Flag{
 	ReaderTimeoutDurationFlag,
 	WriterTimeoutDurationFlag,
 	retrySyncNTimes,
+	EcdsaPrivateKeyFlag,
+	FireblocksAPIKeyFlag,
+	FireblocksAPISecretFlag,
+	FireblocksBaseURLFlag,
+	FireblocksVaultAccountNameFlag,
 }
 
 func init() {
