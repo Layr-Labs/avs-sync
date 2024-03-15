@@ -80,6 +80,18 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		fbSecret := cliCtx.String(FireblocksAPISecretFlag.Name)
 		fbBaseURL := cliCtx.String(FireblocksBaseURLFlag.Name)
 		fbVaultAccountName := cliCtx.String(FireblocksVaultAccountNameFlag.Name)
+		if fbAPIKey == "" {
+			return errors.New("Fireblocks API key is not set")
+		}
+		if fbSecret == "" {
+			return errors.New("Fireblocks API secret is not set")
+		}
+		if fbBaseURL == "" {
+			return errors.New("Fireblocks base URL is not set")
+		}
+		if fbVaultAccountName == "" {
+			return errors.New("Fireblocks vault account name is not set")
+		}
 
 		fireblocksClient, err := fireblocks.NewClient(
 			fbAPIKey,
@@ -98,10 +110,6 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		// TODO: read this from wallet
 		// sender, err = wallet.SenderAddress()
 		sender = common.HexToAddress("0x0000000000000000000000000000000000000123")
-	}
-
-	if wallet == nil {
-		return errors.New("no wallet is configured. Either Fireblocks or PrivateKey wallet should be configured")
 	}
 
 	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, sender)

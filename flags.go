@@ -77,29 +77,29 @@ var (
 	}
 	EcdsaPrivateKeyFlag = cli.StringFlag{
 		Name:   "ecdsa-private-key",
-		Usage:  "Ethereum ecdsa private key",
+		Usage:  "Ethereum ecdsa private key. If not set, Fireblocks credentials must be set.",
 		EnvVar: envVarPrefix + "ECDSA_PRIVATE_KEY",
 	}
 	// Fireblocks flags
 	FireblocksAPIKeyFlag = cli.StringFlag{
 		Name:   "fireblocks-api-key",
-		Usage:  "Fireblocks API Key",
+		Usage:  "Fireblocks API Key. Ignored if ecdsa-private-key is set.",
 		EnvVar: envVarPrefix + "FIREBLOCKS_API_KEY",
 	}
 	FireblocksAPISecretFlag = cli.StringFlag{
 		Name:   "fireblocks-api-secret",
-		Usage:  "Fireblocks API Secret",
+		Usage:  "Fireblocks API Secret. Ignored if ecdsa-private-key is set.",
 		EnvVar: envVarPrefix + "FIREBLOCKS_API_SECRET",
 	}
 	FireblocksBaseURLFlag = cli.StringFlag{
 		Name:   "fireblocks-api-url",
-		Usage:  "Fireblocks API URL",
+		Usage:  "Fireblocks API URL. Ignored if ecdsa-private-key is set.",
 		EnvVar: envVarPrefix + "FIREBLOCKS_API_URL",
 		Value:  "https://api.fireblocks.io",
 	}
 	FireblocksVaultAccountNameFlag = cli.StringFlag{
 		Name:   "fireblocks-vault-account-name",
-		Usage:  "Fireblocks Vault Account Name",
+		Usage:  "Fireblocks Vault Account Name. Ignored if ecdsa-private-key is set.",
 		EnvVar: envVarPrefix + "FIREBLOCKS_VAULT_ACCOUNT_NAME",
 	}
 )
