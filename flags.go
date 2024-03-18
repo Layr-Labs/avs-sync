@@ -128,6 +128,7 @@ var OptionalFlags = []cli.Flag{
 
 func init() {
 	Flags = append(RequiredFlags, OptionalFlags...)
+	Flags = append(Flags, loggerFlags...)
 }
 
 // Flags contains the list of configuration options available to the binary.

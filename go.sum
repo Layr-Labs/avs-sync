@@ -7,14 +7,6 @@ github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1/go.mod h1:xomTg6
 github.com/BurntSushi/toml v1.3.2/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/DataDog/zstd v1.4.5 h1:EndNeuB0l9syBZhut0wns3gV1hL8zX8LIu6ZiVHWLIQ=
 github.com/DataDog/zstd v1.4.5/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
-github.com/Layr-Labs/eigensdk-go v0.1.2 h1:0CbdLMr9IPWFW3RPfPORFWQYgXMAa/K4tA8rncBQ/YY=
-github.com/Layr-Labs/eigensdk-go v0.1.2/go.mod h1:J+d9zxN4VyMtchmsPzGASFcCjpnh1eT4aE2ggiqOz/g=
-github.com/Layr-Labs/eigensdk-go v0.1.3-0.20240314000707-2e4582065143 h1:rE3u3EFI3G/VVjxiXL5YbDBqyzZSNGnZcppwjaef0Dk=
-github.com/Layr-Labs/eigensdk-go v0.1.3-0.20240314000707-2e4582065143/go.mod h1:J+d9zxN4VyMtchmsPzGASFcCjpnh1eT4aE2ggiqOz/g=
-github.com/Layr-Labs/eigensdk-go v0.1.3-0.20240316050204-63be00407527 h1:jxEWXjCfmHT+yUG8VfEKlBjIgOQneBGGbtqwmwPpxtM=
-github.com/Layr-Labs/eigensdk-go v0.1.3-0.20240316050204-63be00407527/go.mod h1:J+d9zxN4VyMtchmsPzGASFcCjpnh1eT4aE2ggiqOz/g=
-github.com/Layr-Labs/eigensdk-go v0.1.3-0.20240316185645-e035f359ddfa h1:c19dWUGTbIhQxbVZko9CCikC3M151OeWNZOOcpjZxOs=
-github.com/Layr-Labs/eigensdk-go v0.1.3-0.20240316185645-e035f359ddfa/go.mod h1:J+d9zxN4VyMtchmsPzGASFcCjpnh1eT4aE2ggiqOz/g=
 github.com/Layr-Labs/eigensdk-go v0.1.3-0.20240318050546-8d038f135826 h1:KENAtjyjJu/wBkVihG2cVdQbEKl44LuPqrj8IVqUFeI=
 github.com/Layr-Labs/eigensdk-go v0.1.3-0.20240318050546-8d038f135826/go.mod h1:J+d9zxN4VyMtchmsPzGASFcCjpnh1eT4aE2ggiqOz/g=
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=
