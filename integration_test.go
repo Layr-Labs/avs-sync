@@ -21,12 +21,14 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/avsregistry"
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/elcontracts"
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/eth"
+	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	chainiomocks "github.com/Layr-Labs/eigensdk-go/chainio/mocks"
 	"github.com/Layr-Labs/eigensdk-go/chainio/txmgr"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
+	"github.com/Layr-Labs/eigensdk-go/types"
 
 	contractreg "github.com/Layr-Labs/avs-sync/bindings/ContractsRegistry"
 )
@@ -61,13 +63,14 @@ func TestIntegrationUpdateSingleOperatorPath(t *testing.T) {
 	}
 	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivKey.PublicKey)
 	operatorBlsPrivKey := "0x1"
-	avsSync := NewTestAvsSync(anvilHttpEndpoint, contractAddresses, []common.Address{operatorAddr}, 30*time.Second)
+	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{operatorAddr}, 30*time.Second)
+	avsSync := c.avsSync
 
 	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
-	registerOperatorWithAvs(anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
+	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
 
 	// get stake of operator before sync
-	operatorsPerQuorumBeforeSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []byte{0})
+	operatorsPerQuorumBeforeSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,14 +78,14 @@ func TestIntegrationUpdateSingleOperatorPath(t *testing.T) {
 
 	// deposit into strategy to create a diff between eigenlayer and avs stakes
 	depositAmount := big.NewInt(100)
-	depositErc20IntoStrategyForOperator(anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
+	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
 
 	// run avsSync
 	go avsSync.Start()
 	time.Sleep(5 * time.Second)
 
 	// get stake of operator after sync
-	operatorsPerQuorumAfterSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []byte{0})
+	operatorsPerQuorumAfterSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,13 +120,14 @@ func TestIntegrationFullOperatorSet(t *testing.T) {
 	}
 	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivKey.PublicKey)
 	operatorBlsPrivKey := "0x1"
-	avsSync := NewTestAvsSync(anvilHttpEndpoint, contractAddresses, []common.Address{}, 30*time.Second)
+	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{}, 30*time.Second)
+	avsSync := c.avsSync
 
 	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
-	registerOperatorWithAvs(anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
+	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
 
 	// get stake of operator before sync
-	operatorsPerQuorumBeforeSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []byte{0})
+	operatorsPerQuorumBeforeSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,14 +136,14 @@ func TestIntegrationFullOperatorSet(t *testing.T) {
 
 	// deposit into strategy to create a diff between eigenlayer and avs stakes
 	depositAmount := big.NewInt(100)
-	depositErc20IntoStrategyForOperator(anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
+	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
 
 	// run avsSync
 	go avsSync.Start()
 	time.Sleep(5 * time.Second)
 
 	// get stake of operator after sync
-	operatorsPerQuorumAfterSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []byte{0})
+	operatorsPerQuorumAfterSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,12 +178,14 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 	contractAddresses := getContractAddressesFromContractRegistry(anvilHttpEndpoint)
 	operatorEcdsaPrivKeyHex := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	operatorBlsPrivKey := "0x1"
-	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
-	registerOperatorWithAvs(anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
-
 	// we create avs sync and replace its avsWriter with a mock that will fail the first 2 times we call UpdateStakesOfEntireOperatorSetForQuorums
 	// and succeed on the third time
-	avsSync := NewTestAvsSync(anvilHttpEndpoint, contractAddresses, []common.Address{}, 30*time.Second)
+	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{}, 30*time.Second)
+	avsSync := c.avsSync
+
+	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
+	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
+
 	mockCtrl := gomock.NewController(t)
 	mockAvsRegistryWriter := chainiomocks.NewMockAvsRegistryWriter(mockCtrl)
 	// this is the test. we just make sure this is called 3 times
@@ -213,13 +219,14 @@ func TestSingleRun(t *testing.T) {
 	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivKey.PublicKey)
 	operatorBlsPrivKey := "0x1"
 	// set sync interval to 0 so that we only run once
-	avsSync := NewTestAvsSync(anvilHttpEndpoint, contractAddresses, []common.Address{}, 0)
+	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{}, 0)
+	avsSync := c.avsSync
 
 	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
-	registerOperatorWithAvs(anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
+	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
 
 	// get stake of operator before sync
-	operatorsPerQuorumBeforeSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []byte{0})
+	operatorsPerQuorumBeforeSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,12 +235,12 @@ func TestSingleRun(t *testing.T) {
 
 	// deposit into strategy to create a diff between eigenlayer and avs stakes
 	depositAmount := big.NewInt(100)
-	depositErc20IntoStrategyForOperator(anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
+	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
 
 	avsSync.Start()
 
 	// get stake of operator after sync
-	operatorsPerQuorumAfterSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []byte{0})
+	operatorsPerQuorumAfterSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,12 +253,16 @@ func TestSingleRun(t *testing.T) {
 	}
 }
 
-func NewTestAvsSync(anvilHttpEndpoint string, contractAddresses ContractAddresses, operators []common.Address, syncInterval time.Duration) *AvsSync {
+type AvsSyncComponents struct {
+	avsSync *AvsSync
+	wallet  walletsdk.Wallet
+}
+
+func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddresses ContractAddresses, operators []common.Address, syncInterval time.Duration) *AvsSyncComponents {
 	logger, err := logging.NewZapLogger(logging.Development)
 	if err != nil {
 		panic(err)
 	}
-
 	ecdsaPrivKey, err := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
 	if err != nil {
 		panic(err)
@@ -276,8 +287,12 @@ func NewTestAvsSync(anvilHttpEndpoint string, contractAddresses ContractAddresse
 	if err != nil {
 		panic(err)
 	}
+	wallet, err := walletsdk.NewPrivateKeyWallet(ethHttpClient, signerFn, ecdsaAddr, logger)
+	if err != nil {
+		panic(err)
+	}
 
-	txMgr := txmgr.NewSimpleTxManager(ethHttpClient, logger, signerFn, ecdsaAddr)
+	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, ecdsaAddr)
 
 	avsWriter, err := avsregistry.BuildAvsRegistryChainWriter(
 		contractAddresses.RegistryCoordinator,
@@ -313,7 +328,10 @@ func NewTestAvsSync(anvilHttpEndpoint string, contractAddresses ContractAddresse
 		5*time.Second,
 		5*time.Second,
 	)
-	return avsSync
+	return &AvsSyncComponents{
+		avsSync: avsSync,
+		wallet:  wallet,
+	}
 }
 
 func startAnvilTestContainer() testcontainers.Container {
@@ -377,12 +395,8 @@ func advanceChainByNBlocks(n int, anvilC testcontainers.Container) {
 }
 
 // TODO(samlaf): move this function to eigensdk
-func registerOperatorWithAvs(ethHttpUrl string, contractAddresses ContractAddresses, ecdsaPrivKeyHex string, blsPrivKeyHex string) {
+func registerOperatorWithAvs(wallet walletsdk.Wallet, ethHttpUrl string, contractAddresses ContractAddresses, ecdsaPrivKeyHex string, blsPrivKeyHex string) {
 	ethHttpClient, err := eth.NewClient(ethHttpUrl)
-	if err != nil {
-		panic(err)
-	}
-	chainid, err := ethHttpClient.ChainID(context.Background())
 	if err != nil {
 		panic(err)
 	}
@@ -395,19 +409,12 @@ func registerOperatorWithAvs(ethHttpUrl string, contractAddresses ContractAddres
 		panic(err)
 	}
 	ecdsaAddr := crypto.PubkeyToAddress(ecdsaPrivKey.PublicKey)
-	// confusing interface, see https://github.com/Layr-Labs/eigensdk-go/issues/90
-	signerFn, _, err := signerv2.SignerFromConfig(signerv2.Config{
-		PrivateKey: ecdsaPrivKey,
-	}, chainid)
-	if err != nil {
-		panic(err)
-	}
 
 	logger, err := logging.NewZapLogger(logging.Development)
 	if err != nil {
 		panic(err)
 	}
-	txMgr := txmgr.NewSimpleTxManager(ethHttpClient, logger, signerFn, ecdsaAddr)
+	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, ecdsaAddr)
 
 	avsWriter, err := avsregistry.BuildAvsRegistryChainWriter(
 		contractAddresses.RegistryCoordinator,
@@ -420,7 +427,7 @@ func registerOperatorWithAvs(ethHttpUrl string, contractAddresses ContractAddres
 		panic(err)
 	}
 
-	quorumNumbers := []byte{0}
+	quorumNumbers := []types.QuorumNum{0}
 	socket := "Not Needed"
 	operatorToAvsRegistrationSigSalt := [32]byte{123}
 	curBlockNum, err := ethHttpClient.BlockNumber(context.Background())
@@ -445,6 +452,7 @@ func registerOperatorWithAvs(ethHttpUrl string, contractAddresses ContractAddres
 
 // TODO(samlaf): move this function to eigensdk
 func depositErc20IntoStrategyForOperator(
+	wallet walletsdk.Wallet,
 	ethHttpUrl string,
 	delegationManagerAddr common.Address,
 	erc20MockStrategyAddr common.Address,
@@ -453,10 +461,6 @@ func depositErc20IntoStrategyForOperator(
 	amount *big.Int,
 ) {
 	ethHttpClient, err := eth.NewClient(ethHttpUrl)
-	if err != nil {
-		panic(err)
-	}
-	chainid, err := ethHttpClient.ChainID(context.Background())
 	if err != nil {
 		panic(err)
 	}
@@ -472,13 +476,7 @@ func depositErc20IntoStrategyForOperator(
 	}
 	noopMetrics := metrics.NewNoopMetrics()
 
-	signerFn, _, err := signerv2.SignerFromConfig(signerv2.Config{
-		PrivateKey: ecdsaPrivKey,
-	}, chainid)
-	if err != nil {
-		panic(err)
-	}
-	txMgr := txmgr.NewSimpleTxManager(ethHttpClient, logger, signerFn, ecdsaAddr)
+	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, ecdsaAddr)
 	elWriter, err := elcontracts.BuildELChainWriter(
 		delegationManagerAddr,
 		common.Address{}, // avsDirectory not needed so we just pass an empty address
