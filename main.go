@@ -58,7 +58,6 @@ func avsSyncMain(cliCtx *cli.Context) error {
 	}
 
 	var wallet walletsdk.Wallet
-	var sender common.Address
 	operatorEcdsaPrivKeyHexStr := cliCtx.String(EcdsaPrivateKeyFlag.Name)
 	if len(operatorEcdsaPrivKeyHexStr) > 0 {
 		ecdsaPrivKey, err := crypto.HexToECDSA(operatorEcdsaPrivKeyHexStr)
@@ -74,16 +73,15 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		sender = address
 	} else {
 		fbAPIKey := cliCtx.String(FireblocksAPIKeyFlag.Name)
-		fbSecret := cliCtx.String(FireblocksAPISecretFlag.Name)
+		fbSecretPath := cliCtx.String(FireblocksAPISecretPathFlag.Name)
 		fbBaseURL := cliCtx.String(FireblocksBaseURLFlag.Name)
 		fbVaultAccountName := cliCtx.String(FireblocksVaultAccountNameFlag.Name)
 		if fbAPIKey == "" {
 			return errors.New("Fireblocks API key is not set")
 		}
-		if fbSecret == "" {
+		if fbSecretPath == "" {
 			return errors.New("Fireblocks API secret is not set")
 		}
 		if fbBaseURL == "" {
@@ -93,9 +91,13 @@ func avsSyncMain(cliCtx *cli.Context) error {
 			return errors.New("Fireblocks vault account name is not set")
 		}
 
+		secretKey, err := os.ReadFile(fbSecretPath)
+		if err != nil {
+			return fmt.Errorf("Cannot read fireblocks secret from %s: %w", fbSecretPath, err)
+		}
 		fireblocksClient, err := fireblocks.NewClient(
 			fbAPIKey,
-			[]byte(fbSecret),
+			[]byte(secretKey),
 			fbBaseURL,
 			writerTimeout,
 			logger,
@@ -107,11 +109,13 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		// TODO: read this from wallet
-		// sender, err = wallet.SenderAddress()
-		sender = common.HexToAddress("0x0000000000000000000000000000000000000123")
 	}
 
+	sender, err := wallet.SenderAddress(context.Background())
+	if err != nil {
+		return fmt.Errorf("Cannot get sender address: %w", err)
+	}
+	logger.Infof("Sender address: %s", sender.Hex())
 	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, sender)
 
 	avsWriter, err := avsregistry.BuildAvsRegistryChainWriter(

@@ -86,10 +86,10 @@ var (
 		Usage:  "Fireblocks API Key. Ignored if ecdsa-private-key is set.",
 		EnvVar: envVarPrefix + "FIREBLOCKS_API_KEY",
 	}
-	FireblocksAPISecretFlag = cli.StringFlag{
-		Name:   "fireblocks-api-secret",
-		Usage:  "Fireblocks API Secret. Ignored if ecdsa-private-key is set.",
-		EnvVar: envVarPrefix + "FIREBLOCKS_API_SECRET",
+	FireblocksAPISecretPathFlag = cli.StringFlag{
+		Name:   "fireblocks-api-secret-path",
+		Usage:  "Path to Fireblocks API Secret. Ignored if ecdsa-private-key is set.",
+		EnvVar: envVarPrefix + "FIREBLOCKS_API_SECRET_PATH",
 	}
 	FireblocksBaseURLFlag = cli.StringFlag{
 		Name:   "fireblocks-api-url",
@@ -121,7 +121,7 @@ var OptionalFlags = []cli.Flag{
 	retrySyncNTimes,
 	EcdsaPrivateKeyFlag,
 	FireblocksAPIKeyFlag,
-	FireblocksAPISecretFlag,
+	FireblocksAPISecretPathFlag,
 	FireblocksBaseURLFlag,
 	FireblocksVaultAccountNameFlag,
 }
