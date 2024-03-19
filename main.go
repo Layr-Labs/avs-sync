@@ -13,7 +13,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/fireblocks"
 	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/chainio/txmgr"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -37,7 +36,11 @@ func main() {
 
 func avsSyncMain(cliCtx *cli.Context) error {
 	log.Println("Registering Node")
-	logger, err := logging.NewZapLogger(logging.Development)
+	loggerConfig, err := ReadLoggerCLIConfig(cliCtx)
+	if err != nil {
+		return err
+	}
+	logger, err := NewLogger(*loggerConfig)
 	if err != nil {
 		return err
 	}
