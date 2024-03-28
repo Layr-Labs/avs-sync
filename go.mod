@@ -5,6 +5,7 @@ go 1.21.2
 require (
 	github.com/Layr-Labs/eigensdk-go v0.1.3
 	github.com/ethereum/go-ethereum v1.13.14
+	github.com/prometheus/client_golang v1.19.0
 	github.com/testcontainers/testcontainers-go v0.29.1
 	github.com/urfave/cli v1.22.14
 	go.uber.org/mock v0.4.0
@@ -59,7 +60,6 @@ require (
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
-	github.com/prometheus/client_golang v1.19.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.48.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
@@ -92,4 +92,4 @@ require (
 )
 
 // use this when making changes to eigensdk locally
-replace github.com/Layr-Labs/eigensdk-go => ../eigensdk-go
+// replace github.com/Layr-Labs/eigensdk-go => ../eigensdk-go
