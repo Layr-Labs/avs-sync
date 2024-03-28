@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/avsregistry"
@@ -10,6 +12,8 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/types"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type AvsSync struct {
@@ -26,6 +30,7 @@ type AvsSync struct {
 
 	readerTimeoutDuration time.Duration
 	writerTimeoutDuration time.Duration
+	prometheusServerAddr  string
 }
 
 // NewAvsSync creates a new AvsSync object
@@ -38,8 +43,8 @@ func NewAvsSync(
 	avsReader avsregistry.AvsRegistryReader, avsWriter avsregistry.AvsRegistryWriter,
 	sleepBeforeFirstSyncDuration time.Duration, syncInterval time.Duration, operators []common.Address,
 	quorums []byte, fetchQuorumsDynamically bool, retrySyncNTimes int,
-	readerTimeoutDuration time.Duration,
-	writerTimeoutDuration time.Duration,
+	readerTimeoutDuration time.Duration, writerTimeoutDuration time.Duration,
+	prometheusServerAddr string,
 ) *AvsSync {
 	return &AvsSync{
 		logger:                       logger,
@@ -53,6 +58,7 @@ func NewAvsSync(
 		retrySyncNTimes:              retrySyncNTimes,
 		readerTimeoutDuration:        readerTimeoutDuration,
 		writerTimeoutDuration:        writerTimeoutDuration,
+		prometheusServerAddr:         prometheusServerAddr,
 	}
 }
 
@@ -67,7 +73,14 @@ func (a *AvsSync) Start() {
 		"fetchQuorumsDynamically", a.fetchQuorumsDynamically,
 		"readerTimeoutDuration", a.readerTimeoutDuration,
 		"writerTimeoutDuration", a.writerTimeoutDuration,
+		"prometheusServerAddr", a.prometheusServerAddr,
 	)
+
+	if a.prometheusServerAddr != "" {
+		StartMetricsServer(a.prometheusServerAddr)
+	} else {
+		a.logger.Info("Prometheus server address not set, not starting metrics server")
+	}
 
 	// ticker doesn't tick immediately, so we send a first updateStakes here
 	// see https://github.com/golang/go/issues/17601
@@ -115,11 +128,16 @@ func (a *AvsSync) updateStakes() error {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), a.writerTimeoutDuration)
 		defer cancel()
 		// this one we update all quorums at once, since we're only updating a subset of operators (which should be a small number)
-		_, err := a.avsWriter.UpdateStakesOfOperatorSubsetForAllQuorums(timeoutCtx, a.operators)
-		if err == nil {
-			a.logger.Info("Completed stake update successfully")
+		receipt, err := a.avsWriter.UpdateStakesOfOperatorSubsetForAllQuorums(timeoutCtx, a.operators)
+		if err != nil {
+			erroredTxs.Inc()
+			return err
+		} else if receipt.Status == gethtypes.ReceiptStatusFailed {
+			revertedTxs.Inc()
+			return errors.New("Update stakes of operator subset for all quorums reverted")
 		}
-		return err
+		a.logger.Info("Completed stake update successfully")
+		return nil
 	}
 }
 
@@ -158,15 +176,22 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 		}
 		var operators []common.Address
 		operators = append(operators, operatorAddrsPerQuorum[0]...)
+		operatorsUpdated.With(prometheus.Labels{"quorum": strconv.Itoa(int(quorum))}).Set(float64(len(operators)))
 		sort.Slice(operators, func(i, j int) bool {
 			return operators[i].Big().Cmp(operators[j].Big()) < 0
 		})
 		a.logger.Infof("Updating stakes of operators in quorum %d: %v", int(quorum), operators)
 		timeoutCtx, cancel = context.WithTimeout(context.Background(), a.writerTimeoutDuration)
 		defer cancel()
-		_, err = a.avsWriter.UpdateStakesOfEntireOperatorSetForQuorums(timeoutCtx, [][]common.Address{operators}, types.QuorumNums{types.QuorumNum(quorum)})
+		receipt, err := a.avsWriter.UpdateStakesOfEntireOperatorSetForQuorums(timeoutCtx, [][]common.Address{operators}, types.QuorumNums{types.QuorumNum(quorum)})
 		if err != nil {
+			erroredTxs.Inc()
 			a.logger.Error("Error updating stakes of entire operator set for quorum", "err", err, "quorum", int(quorum))
+			continue
+		}
+		if receipt.Status == gethtypes.ReceiptStatusFailed {
+			revertedTxs.Inc()
+			a.logger.Infof("Successfully updated stakes of operators in quorum %d", int(quorum))
 			continue
 		}
 		return
