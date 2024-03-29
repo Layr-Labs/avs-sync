@@ -3,7 +3,7 @@ module github.com/Layr-Labs/avs-sync
 go 1.21.2
 
 require (
-	github.com/Layr-Labs/eigensdk-go v0.1.3
+	github.com/Layr-Labs/eigensdk-go v0.1.4-0.20240329184527-d5c0a153a1c4
 	github.com/ethereum/go-ethereum v1.13.14
 	github.com/prometheus/client_golang v1.19.0
 	github.com/testcontainers/testcontainers-go v0.29.1
