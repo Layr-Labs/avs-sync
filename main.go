@@ -181,7 +181,7 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		cliCtx.Int(retrySyncNTimes.Name),
 		readerTimeout,
 		writerTimeout,
-		cliCtx.String(PrometheusServerAddrFlag.Name),
+		cliCtx.String(MetricsAddrFlag.Name),
 	)
 
 	avsSync.Start()
