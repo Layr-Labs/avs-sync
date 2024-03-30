@@ -8,24 +8,36 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+const metricsNamespace = "avssync"
+
+type UpdateStakeStatus string
+
+const (
+	UpdateStakeStatusError   UpdateStakeStatus = "error"
+	UpdateStakeStatusSucceed UpdateStakeStatus = "succeed"
+)
+
 var (
-	erroredTxs = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "errored_txs_total",
-		Help: "The total number of transactions that errored (failed to get processed by chain)",
-	})
-	revertedTxs = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "reverted_txs_total",
-		Help: "The total number of transactions that reverted (processed by chain but reverted)",
+	updateStakeAttempt = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: metricsNamespace,
+		Name:      "update_stake_attempt",
+		Help:      "Result from an update stake attempt. Either succeed or error (either tx was mined but reverted, or failed to get processed by chain).",
+	}, []string{"status"})
+	txRevertedTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: metricsNamespace,
+		Name:      "tx_reverted_total",
+		Help:      "The total number of transactions that made it onchain but reverted (most likely because out of gas)",
 	})
 	operatorsUpdated = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "operators_updated",
-		Help: "The total number of operators updated (during the last quorum sync)",
+		Namespace: metricsNamespace,
+		Name:      "operators_updated",
+		Help:      "The total number of operators updated (during the last quorum sync)",
 	}, []string{"quorum"})
 )
 
 func StartMetricsServer(metricsAddr string) {
 	registry := prometheus.NewRegistry()
-	registry.MustRegister(erroredTxs, revertedTxs, operatorsUpdated)
+	registry.MustRegister(updateStakeAttempt, txRevertedTotal, operatorsUpdated)
 	http.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 	// not sure if we need to handle this error, since if metric server errors, then we will get alerts from grafana
 	go http.ListenAndServe(metricsAddr, nil)
