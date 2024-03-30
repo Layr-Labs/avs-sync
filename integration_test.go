@@ -13,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -190,7 +191,7 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 	mockAvsRegistryWriter := chainiomocks.NewMockAvsRegistryWriter(mockCtrl)
 	// this is the test. we just make sure this is called 3 times
 	mockAvsRegistryWriter.EXPECT().UpdateStakesOfEntireOperatorSetForQuorums(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("error")).Times(2)
-	mockAvsRegistryWriter.EXPECT().UpdateStakesOfEntireOperatorSetForQuorums(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
+	mockAvsRegistryWriter.EXPECT().UpdateStakesOfEntireOperatorSetForQuorums(gomock.Any(), gomock.Any(), gomock.Any()).Return(&gethtypes.Receipt{Status: gethtypes.ReceiptStatusSuccessful}, nil)
 	avsSync.avsWriter = mockAvsRegistryWriter
 	avsSync.retrySyncNTimes = 3
 
@@ -327,6 +328,7 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 		1, // 1 retry
 		5*time.Second,
 		5*time.Second,
+		"", // no metrics server (otherwise parallel tests all try to start server at same endpoint and error out)
 	)
 	return &AvsSyncComponents{
 		avsSync: avsSync,

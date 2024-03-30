@@ -10,8 +10,8 @@ help:
 # include .env
 # export
 
-start-anvil-goerli-fork: ## 
-	anvil --fork-url https://goerli.gateway.tenderly.co
+start-anvil-holesky-fork: ## 
+	anvil --fork-url https://ethereum-holesky-rpc.publicnode.com
 
 run-avs-sync: ## 
 	@# we export the env vars from .env file and then run the go program

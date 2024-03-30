@@ -75,14 +75,15 @@ The test can be run via:
 make test
 ```
 
-#### Against a goerli fork
+#### Against a holesky fork
 
-The most recent eigenDA m2 deployment is accessible [here](https://docs.google.com/spreadsheets/d/1UgXnn_9U5mQ6jvj_y1oKjxTG5q0IoYdFvM1704inPGg/edit#gid=0). We can test avssync against this deployment by running a goerli fork and running the tests against it.
-First create a .env file by copying the example .env.example file, and adjust the variables as needed. You should only need to enter a private key that has goerli eth.
+The most recent eigenDA holesky deployment is accessible [here](https://github.com/Layr-Labs/eigenda/blob/master/contracts/script/deploy/holesky/output/holesky_testnet_deployment_data.json). We can test avssync against this deployment by running a holesky fork and running the tests against it.
+
+First create a .env file by copying the example .env.example file, and adjust the variables as needed. You will need to enter a private key that has holesky eth, and you will most likely also need to set `AVS_SYNC_READER_TIMEOUT_DURATION` to at least 1m, since retrieving the operator state can take a while the first time anvil is querying the holesky fork and filling its local cache.
 
 Then run
 ```
-make start-anvil-goerli-fork
+make start-anvil-holesky-fork
 ```
 and in a separate terminal
 ```
