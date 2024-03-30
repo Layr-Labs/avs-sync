@@ -36,16 +36,16 @@ var (
 		EnvVar:   envVarPrefix + "SYNC_INTERVAL",
 	}
 	/* Optional Flags */
-	PrometheusServerAddrFlag = cli.StringFlag{
-		Name:   "prometheus-server-addr",
-		Usage:  "Prometheus server address",
+	MetricsAddrFlag = cli.StringFlag{
+		Name:   "metrics-addr",
+		Usage:  "Prometheus server address (ip:port)",
 		Value:  ":9090",
 		EnvVar: envVarPrefix + "PROMETHEUS_SERVER_ADDR",
 	}
 	FirstSyncTimeFlag = cli.StringFlag{
 		Name:     "first-sync-time",
 		Required: false,
-		Usage:    "Set the HH:MI:SS time at which to run the first sync update",
+		Usage:    "Set the HH:MI:SS time at which to run the first sync update (in UTC)",
 		EnvVar:   envVarPrefix + "FIRST_SYNC_TIME",
 	}
 	OperatorListFlag = cli.StringSliceFlag{
@@ -118,7 +118,7 @@ var RequiredFlags = []cli.Flag{
 }
 
 var OptionalFlags = []cli.Flag{
-	PrometheusServerAddrFlag,
+	MetricsAddrFlag,
 	FirstSyncTimeFlag,
 	OperatorListFlag,
 	QuorumListFlag,

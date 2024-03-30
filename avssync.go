@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"sort"
 	"strconv"
 	"time"
@@ -87,10 +86,7 @@ func (a *AvsSync) Start() {
 	// we first sleep some amount of time before the first sync, which allows the syncs to happen at some preferred time
 	// for eg midnight every night, without needing to schedule the start of avssync outside of this program
 	time.Sleep(a.sleepBeforeFirstSyncDuration)
-	err := a.updateStakes()
-	if err != nil {
-		a.logger.Error("Error updating stakes", err)
-	}
+	a.updateStakes()
 
 	if a.syncInterval == 0 {
 		a.logger.Infof("Sync interval is 0, running updateStakes once and exiting")
@@ -102,15 +98,12 @@ func (a *AvsSync) Start() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		err := a.updateStakes()
-		if err != nil {
-			a.logger.Error("Error updating stakes", err)
-		}
+		a.updateStakes()
 		a.logger.Infof("Sleeping for %s", a.syncInterval)
 	}
 }
 
-func (a *AvsSync) updateStakes() error {
+func (a *AvsSync) updateStakes() {
 	if len(a.operators) == 0 {
 		a.logger.Info("Updating stakes of entire operator set")
 		a.maybeUpdateQuorumSet()
@@ -122,7 +115,6 @@ func (a *AvsSync) updateStakes() error {
 			a.tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum, a.retrySyncNTimes)
 		}
 		a.logger.Info("Completed stake update. Check logs to make sure every quorum update succeeded successfully.")
-		return nil
 	} else {
 		a.logger.Infof("Updating stakes of operators: %v", a.operators)
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), a.writerTimeoutDuration)
@@ -130,14 +122,16 @@ func (a *AvsSync) updateStakes() error {
 		// this one we update all quorums at once, since we're only updating a subset of operators (which should be a small number)
 		receipt, err := a.avsWriter.UpdateStakesOfOperatorSubsetForAllQuorums(timeoutCtx, a.operators)
 		if err != nil {
-			erroredTxs.Inc()
-			return err
+			updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusError)}).Inc()
+			a.logger.Error("Error updating stakes of operator subset for all quorums", err)
+			return
 		} else if receipt.Status == gethtypes.ReceiptStatusFailed {
-			revertedTxs.Inc()
-			return errors.New("Update stakes of operator subset for all quorums reverted")
+			txRevertedTotal.Inc()
+			a.logger.Error("Update stakes of operator subset for all quorums reverted")
+			return
 		}
 		a.logger.Info("Completed stake update successfully")
-		return nil
+		return
 	}
 }
 
@@ -151,6 +145,7 @@ func (a *AvsSync) maybeUpdateQuorumSet() {
 	quorumCount, err := a.avsReader.GetQuorumCount(&bind.CallOpts{Context: timeoutCtx})
 	if err != nil {
 		a.logger.Error("Error fetching quorum set dynamically", err)
+		return
 	}
 	// quorums are numbered from 0 to quorumCount-1,
 	// so we just create a list of bytes from 0 to quorumCount-1
@@ -171,7 +166,7 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 		// in between us fetching it and trying to update it (the contract makes sure the entire operator set is updated and reverts if not)
 		operatorAddrsPerQuorum, err := a.avsReader.GetOperatorAddrsInQuorumsAtCurrentBlock(&bind.CallOpts{Context: timeoutCtx}, types.QuorumNums{types.QuorumNum(quorum)})
 		if err != nil {
-			a.logger.Error("Error fetching operator addresses in quorums", "err", err, "quorum", quorum, "retryNTimes", retryNTimes, "try", i+1)
+			a.logger.Warn("Error fetching operator addresses in quorums", "err", err, "quorum", quorum, "retryNTimes", retryNTimes, "try", i+1)
 			continue
 		}
 		var operators []common.Address
@@ -185,17 +180,18 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 		defer cancel()
 		receipt, err := a.avsWriter.UpdateStakesOfEntireOperatorSetForQuorums(timeoutCtx, [][]common.Address{operators}, types.QuorumNums{types.QuorumNum(quorum)})
 		if err != nil {
-			erroredTxs.Inc()
-			a.logger.Error("Error updating stakes of entire operator set for quorum", "err", err, "quorum", int(quorum))
+			a.logger.Warn("Error updating stakes of entire operator set for quorum", "err", err, "quorum", int(quorum), "retryNTimes", retryNTimes, "try", i+1)
 			continue
 		}
 		if receipt.Status == gethtypes.ReceiptStatusFailed {
-			revertedTxs.Inc()
-			a.logger.Infof("Successfully updated stakes of operators in quorum %d", int(quorum))
+			txRevertedTotal.Inc()
+			a.logger.Error("Update stakes of entire operator set for quorum reverted", "quorum", int(quorum))
 			continue
 		}
+		updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusSucceed)}).Inc()
 		return
 	}
+	updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusError)}).Inc()
 	a.logger.Error("Giving up after retrying", "retryNTimes", retryNTimes)
 }
 
