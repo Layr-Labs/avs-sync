@@ -22,7 +22,7 @@ var (
 		Namespace: metricsNamespace,
 		Name:      "update_stake_attempt",
 		Help:      "Result from an update stake attempt. Either succeed or error (either tx was mined but reverted, or failed to get processed by chain).",
-	}, []string{"status"})
+	}, []string{"status", "quorum"})
 	txRevertedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: metricsNamespace,
 		Name:      "tx_reverted_total",
