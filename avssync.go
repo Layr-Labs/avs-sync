@@ -122,7 +122,8 @@ func (a *AvsSync) updateStakes() {
 		// this one we update all quorums at once, since we're only updating a subset of operators (which should be a small number)
 		receipt, err := a.avsWriter.UpdateStakesOfOperatorSubsetForAllQuorums(timeoutCtx, a.operators)
 		if err != nil {
-			updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusError)}).Inc()
+			// no quorum label means we are updating all quorums
+			updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusError), "quorum": ""}).Inc()
 			a.logger.Error("Error updating stakes of operator subset for all quorums", err)
 			return
 		} else if receipt.Status == gethtypes.ReceiptStatusFailed {
@@ -188,10 +189,10 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 			a.logger.Error("Update stakes of entire operator set for quorum reverted", "quorum", int(quorum))
 			continue
 		}
-		updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusSucceed)}).Inc()
+		updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusSucceed), "quorum": strconv.Itoa(int(quorum))}).Inc()
 		return
 	}
-	updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusError)}).Inc()
+	updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusError), "quorum": strconv.Itoa(int(quorum))}).Inc()
 	a.logger.Error("Giving up after retrying", "retryNTimes", retryNTimes)
 }
 
