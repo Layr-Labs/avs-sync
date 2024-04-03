@@ -81,16 +81,42 @@ var (
 		Value:  3,
 		EnvVar: envVarPrefix + "RETRY_SYNC_N_TIMES",
 	}
+	UseFireblocksFlag = cli.BoolTFlag{
+		Name:     "use-fireblocks",
+		Usage:    "Use Fireblocks to sign transactions. Ignores ecdsa-private-key. Fireblocks credentials must be provided.",
+		Required: false,
+		EnvVar:   envVarPrefix + "USE_FIREBLOCKS",
+	}
+	SecretManagerRegionFlag = cli.StringFlag{
+		Name:   "secret-manager-region",
+		Usage:  "Region of the secret manager",
+		EnvVar: envVarPrefix + "SECRET_MANAGER_REGION",
+	}
+	SecretManagerEcdsaPrivateKeyNameFlag = cli.StringFlag{
+		Name:   "secret-manager-ecdsa-private-key-name",
+		Usage:  "Name of the secret in the secret manager that contains the Ethereum ecdsa private key. If not set, ecdsa-private-key must be specified.",
+		EnvVar: envVarPrefix + "SECRET_MANAGER_ECDSA_PRIVATE_KEY_NAME",
+	}
 	EcdsaPrivateKeyFlag = cli.StringFlag{
 		Name:   "ecdsa-private-key",
 		Usage:  "Ethereum ecdsa private key. If not set, Fireblocks credentials must be set.",
 		EnvVar: envVarPrefix + "ECDSA_PRIVATE_KEY",
 	}
 	// Fireblocks flags
+	SecretManagerFireblocksAPIKeyNameFlag = cli.StringFlag{
+		Name:   "secret-manager-fireblocks-api-key-name",
+		Usage:  "Name of the secret in the secret manager that contains the Fireblocks API Key.",
+		EnvVar: envVarPrefix + "SECRET_MANAGER_FIREBLOCKS_API_KEY_NAME",
+	}
 	FireblocksAPIKeyFlag = cli.StringFlag{
 		Name:   "fireblocks-api-key",
 		Usage:  "Fireblocks API Key. Ignored if ecdsa-private-key is set.",
 		EnvVar: envVarPrefix + "FIREBLOCKS_API_KEY",
+	}
+	SecretManagerFireblocksAPISecretNameFlag = cli.StringFlag{
+		Name:   "secret-manager-fireblocks-api-secret-name",
+		Usage:  "Name of the secret in the secret manager that contains the Fireblocks API Secret.",
+		EnvVar: envVarPrefix + "SECRET_MANAGER_FIREBLOCKS_API_SECRET_NAME",
 	}
 	FireblocksAPISecretPathFlag = cli.StringFlag{
 		Name:   "fireblocks-api-secret-path",
@@ -126,8 +152,13 @@ var OptionalFlags = []cli.Flag{
 	ReaderTimeoutDurationFlag,
 	WriterTimeoutDurationFlag,
 	retrySyncNTimes,
+	UseFireblocksFlag,
+	SecretManagerRegionFlag,
+	SecretManagerEcdsaPrivateKeyNameFlag,
 	EcdsaPrivateKeyFlag,
+	SecretManagerFireblocksAPIKeyNameFlag,
 	FireblocksAPIKeyFlag,
+	SecretManagerFireblocksAPISecretNameFlag,
 	FireblocksAPISecretPathFlag,
 	FireblocksBaseURLFlag,
 	FireblocksVaultAccountNameFlag,
