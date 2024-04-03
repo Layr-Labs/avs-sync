@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
+	"github.com/Layr-Labs/eigensdk-go/aws/secretmanager"
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/avsregistry"
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/eth"
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/fireblocks"
@@ -61,30 +63,46 @@ func avsSyncMain(cliCtx *cli.Context) error {
 	}
 
 	var wallet walletsdk.Wallet
-	operatorEcdsaPrivKeyHexStr := cliCtx.String(EcdsaPrivateKeyFlag.Name)
-	if len(operatorEcdsaPrivKeyHexStr) > 0 {
-		ecdsaPrivKey, err := crypto.HexToECDSA(operatorEcdsaPrivKeyHexStr)
-		if err != nil {
-			return fmt.Errorf("Cannot create ecdsa private key: %w", err)
+	if cliCtx.Bool(UseFireblocksFlag.Name) {
+		var apiKey string
+		var secretKey []byte
+		var err error
+
+		region := cliCtx.String(SecretManagerRegionFlag.Name)
+		if len(region) >= 0 {
+			logger.Info("Using secret manager to read fireblocks api key and secret")
+			smFireblocksAPIKeyName := cliCtx.String(SecretManagerFireblocksAPIKeyNameFlag.Name)
+			smFireblockAPISecretName := cliCtx.String(SecretManagerFireblocksAPISecretNameFlag.Name)
+			if len(smFireblocksAPIKeyName) > 0 && len(smFireblockAPISecretName) > 0 {
+				apiKey, err = secretmanager.ReadStringFromSecretManager(context.Background(), smFireblocksAPIKeyName, region)
+				if err != nil {
+					return fmt.Errorf("Cannot read fireblocks api key from secret manager: %w", err)
+				}
+				secretKeyStr, err := secretmanager.ReadStringFromSecretManager(context.Background(), smFireblockAPISecretName, region)
+				if err != nil {
+					return fmt.Errorf("Cannot read fireblocks secret from secret manager: %w", err)
+				}
+				secretKey = []byte(secretKeyStr)
+			}
 		}
 
-		signerV2, address, err := signerv2.SignerFromConfig(signerv2.Config{PrivateKey: ecdsaPrivKey}, chainid)
-		if err != nil {
-			return err
+		// If the secret manager values are not set, try to read from flags
+		if len(apiKey) == 0 || len(secretKey) == 0 {
+			logger.Info("Reading fireblocks api key and secret from flags")
+			apiKey = cliCtx.String(FireblocksAPIKeyFlag.Name)
+			secretPath := cliCtx.String(FireblocksAPISecretPathFlag.Name)
+			secretKey, err = os.ReadFile(secretPath)
+			if err != nil {
+				return fmt.Errorf("Cannot read fireblocks secret from %s: %w", secretPath, err)
+			}
 		}
-		wallet, err = walletsdk.NewPrivateKeyWallet(ethHttpClient, signerV2, address, logger)
-		if err != nil {
-			return err
-		}
-	} else {
-		fbAPIKey := cliCtx.String(FireblocksAPIKeyFlag.Name)
-		fbSecretPath := cliCtx.String(FireblocksAPISecretPathFlag.Name)
+
 		fbBaseURL := cliCtx.String(FireblocksBaseURLFlag.Name)
 		fbVaultAccountName := cliCtx.String(FireblocksVaultAccountNameFlag.Name)
-		if fbAPIKey == "" {
+		if apiKey == "" {
 			return errors.New("Fireblocks API key is not set")
 		}
-		if fbSecretPath == "" {
+		if len(secretKey) == 0 {
 			return errors.New("Fireblocks API secret is not set")
 		}
 		if fbBaseURL == "" {
@@ -94,13 +112,9 @@ func avsSyncMain(cliCtx *cli.Context) error {
 			return errors.New("Fireblocks vault account name is not set")
 		}
 
-		secretKey, err := os.ReadFile(fbSecretPath)
-		if err != nil {
-			return fmt.Errorf("Cannot read fireblocks secret from %s: %w", fbSecretPath, err)
-		}
 		fireblocksClient, err := fireblocks.NewClient(
-			fbAPIKey,
-			[]byte(secretKey),
+			apiKey,
+			secretKey,
 			fbBaseURL,
 			writerTimeout,
 			logger,
@@ -109,6 +123,30 @@ func avsSyncMain(cliCtx *cli.Context) error {
 			return err
 		}
 		wallet, err = walletsdk.NewFireblocksWallet(fireblocksClient, ethHttpClient, fbVaultAccountName, logger)
+		if err != nil {
+			return err
+		}
+	} else {
+		logger.Info("Using ecdsa private key to create wallet")
+		var ecdsaPrivKey *ecdsa.PrivateKey
+		smOperatorEcdsaPrivKeyHexStr := cliCtx.String(SecretManagerEcdsaPrivateKeyNameFlag.Name)
+		if len(smOperatorEcdsaPrivKeyHexStr) > 0 {
+			ecdsaPrivKey, err = crypto.HexToECDSA(smOperatorEcdsaPrivKeyHexStr)
+			if err != nil {
+				return fmt.Errorf("Cannot create ecdsa private key: %w", err)
+			}
+		} else {
+			operatorEcdsaPrivKeyHexStr := cliCtx.String(EcdsaPrivateKeyFlag.Name)
+			ecdsaPrivKey, err = crypto.HexToECDSA(operatorEcdsaPrivKeyHexStr)
+			if err != nil {
+				return fmt.Errorf("Cannot create ecdsa private key: %w", err)
+			}
+		}
+		signerV2, address, err := signerv2.SignerFromConfig(signerv2.Config{PrivateKey: ecdsaPrivKey}, chainid)
+		if err != nil {
+			return err
+		}
+		wallet, err = walletsdk.NewPrivateKeyWallet(ethHttpClient, signerV2, address, logger)
 		if err != nil {
 			return err
 		}
