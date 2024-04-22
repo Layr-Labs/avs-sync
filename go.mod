@@ -4,7 +4,7 @@ go 1.21.2
 
 require (
 	github.com/Layr-Labs/eigensdk-go v0.1.4-0.20240330002735-c0efcad71d31
-	github.com/ethereum/go-ethereum v1.13.14
+	github.com/ethereum/go-ethereum v1.13.15
 	github.com/prometheus/client_golang v1.19.0
 	github.com/testcontainers/testcontainers-go v0.29.1
 	github.com/urfave/cli v1.22.14
