@@ -7,7 +7,7 @@ require (
 	github.com/ethereum/go-ethereum v1.13.14
 	github.com/prometheus/client_golang v1.19.0
 	github.com/testcontainers/testcontainers-go v0.29.1
-	github.com/urfave/cli v1.22.14
+	github.com/urfave/cli v1.22.15
 	go.uber.org/mock v0.4.0
 )
 
@@ -41,7 +41,7 @@ require (
 	github.com/containerd/containerd v1.7.12 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/cpuguy83/dockercfg v0.3.1 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/crate-crypto/go-kzg-4844 v0.7.0 // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
