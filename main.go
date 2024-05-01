@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Layr-Labs/avs-sync/avssync"
 	"github.com/Layr-Labs/eigensdk-go/aws/secretmanager"
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/avsregistry"
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/eth"
@@ -207,7 +208,7 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		sleepBeforeFirstSyncDuration = firstSyncTime.Sub(now)
 	}
 	logger.Infof("Sleeping for %v before first sync, so that it happens at %v", sleepBeforeFirstSyncDuration, time.Now().Add(sleepBeforeFirstSyncDuration))
-	avsSync := NewAvsSync(
+	avsSync := avssync.NewAvsSync(
 		logger,
 		avsReader,
 		avsWriter,

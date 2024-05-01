@@ -31,6 +31,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
 	"github.com/Layr-Labs/eigensdk-go/types"
 
+	"github.com/Layr-Labs/avs-sync/avssync"
 	contractreg "github.com/Layr-Labs/avs-sync/bindings/ContractsRegistry"
 )
 
@@ -71,7 +72,7 @@ func TestIntegrationUpdateSingleOperatorPath(t *testing.T) {
 	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
 
 	// get stake of operator before sync
-	operatorsPerQuorumBeforeSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
+	operatorsPerQuorumBeforeSync, err := c.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +87,7 @@ func TestIntegrationUpdateSingleOperatorPath(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	// get stake of operator after sync
-	operatorsPerQuorumAfterSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
+	operatorsPerQuorumAfterSync, err := c.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +129,7 @@ func TestIntegrationFullOperatorSet(t *testing.T) {
 	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
 
 	// get stake of operator before sync
-	operatorsPerQuorumBeforeSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
+	operatorsPerQuorumBeforeSync, err := c.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +145,7 @@ func TestIntegrationFullOperatorSet(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	// get stake of operator after sync
-	operatorsPerQuorumAfterSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
+	operatorsPerQuorumAfterSync, err := c.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,8 +193,8 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 	// this is the test. we just make sure this is called 3 times
 	mockAvsRegistryWriter.EXPECT().UpdateStakesOfEntireOperatorSetForQuorums(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("error")).Times(2)
 	mockAvsRegistryWriter.EXPECT().UpdateStakesOfEntireOperatorSetForQuorums(gomock.Any(), gomock.Any(), gomock.Any()).Return(&gethtypes.Receipt{Status: gethtypes.ReceiptStatusSuccessful}, nil)
-	avsSync.avsWriter = mockAvsRegistryWriter
-	avsSync.retrySyncNTimes = 3
+	avsSync.AvsWriter = mockAvsRegistryWriter
+	avsSync.RetrySyncNTimes = 3
 
 	// run avsSync
 	go avsSync.Start()
@@ -227,7 +228,7 @@ func TestSingleRun(t *testing.T) {
 	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
 
 	// get stake of operator before sync
-	operatorsPerQuorumBeforeSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
+	operatorsPerQuorumBeforeSync, err := avsSync.AvsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +242,7 @@ func TestSingleRun(t *testing.T) {
 	avsSync.Start()
 
 	// get stake of operator after sync
-	operatorsPerQuorumAfterSync, err := avsSync.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
+	operatorsPerQuorumAfterSync, err := avsSync.AvsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,8 +256,10 @@ func TestSingleRun(t *testing.T) {
 }
 
 type AvsSyncComponents struct {
-	avsSync *AvsSync
-	wallet  walletsdk.Wallet
+	avsSync   *avssync.AvsSync
+	wallet    walletsdk.Wallet
+	avsReader *avsregistry.AvsRegistryChainReader
+	avsWriter *avsregistry.AvsRegistryChainWriter
 }
 
 func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddresses ContractAddresses, operators []common.Address, syncInterval time.Duration) *AvsSyncComponents {
@@ -315,7 +318,7 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 		logger.Fatalf("Cannot create avs reader", "err", err)
 	}
 
-	avsSync := NewAvsSync(
+	avsSync := avssync.NewAvsSync(
 		logger,
 		avsReader,
 		avsWriter,
@@ -331,8 +334,10 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 		"", // no metrics server (otherwise parallel tests all try to start server at same endpoint and error out)
 	)
 	return &AvsSyncComponents{
-		avsSync: avsSync,
-		wallet:  wallet,
+		avsSync:   avsSync,
+		wallet:    wallet,
+		avsReader: avsReader,
+		avsWriter: avsWriter,
 	}
 }
 
