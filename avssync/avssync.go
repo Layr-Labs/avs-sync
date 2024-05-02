@@ -1,4 +1,4 @@
-package main
+package avssync
 
 import (
 	"context"
@@ -16,16 +16,16 @@ import (
 )
 
 type AvsSync struct {
-	logger    sdklogging.Logger
-	avsReader avsregistry.AvsRegistryReader
-	avsWriter avsregistry.AvsRegistryWriter
+	AvsReader       avsregistry.AvsRegistryReader
+	AvsWriter       avsregistry.AvsRegistryWriter
+	RetrySyncNTimes int
 
+	logger                       sdklogging.Logger
 	sleepBeforeFirstSyncDuration time.Duration
 	syncInterval                 time.Duration
 	operators                    []common.Address // empty means we update all operators
 	quorums                      []byte
 	fetchQuorumsDynamically      bool
-	retrySyncNTimes              int
 
 	readerTimeoutDuration time.Duration
 	writerTimeoutDuration time.Duration
@@ -46,22 +46,22 @@ func NewAvsSync(
 	prometheusServerAddr string,
 ) *AvsSync {
 	return &AvsSync{
+		AvsReader:                    avsReader,
+		AvsWriter:                    avsWriter,
+		RetrySyncNTimes:              retrySyncNTimes,
 		logger:                       logger,
-		avsReader:                    avsReader,
-		avsWriter:                    avsWriter,
 		sleepBeforeFirstSyncDuration: sleepBeforeFirstSyncDuration,
 		syncInterval:                 syncInterval,
 		operators:                    operators,
 		quorums:                      quorums,
 		fetchQuorumsDynamically:      fetchQuorumsDynamically,
-		retrySyncNTimes:              retrySyncNTimes,
 		readerTimeoutDuration:        readerTimeoutDuration,
 		writerTimeoutDuration:        writerTimeoutDuration,
 		prometheusServerAddr:         prometheusServerAddr,
 	}
 }
 
-func (a *AvsSync) Start() {
+func (a *AvsSync) Start(ctx context.Context) {
 	// TODO: should prob put all of these in a config struct, to make sure we don't forget to print any of them
 	//       when we add new ones.
 	a.logger.Info("Avssync config",
@@ -97,9 +97,15 @@ func (a *AvsSync) Start() {
 	ticker := time.NewTicker(a.syncInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		a.updateStakes()
-		a.logger.Infof("Sleeping for %s", a.syncInterval)
+	for {
+		select {
+		case <-ctx.Done():
+			a.logger.Info("Context done, exiting")
+			return
+		case <-ticker.C:
+			a.updateStakes()
+			a.logger.Infof("Sleeping for %s", a.syncInterval)
+		}
 	}
 }
 
@@ -112,7 +118,7 @@ func (a *AvsSync) updateStakes() {
 		// we update one quorum at a time, just to make sure we don't run into any gas limit issues
 		// in case there are a lot of operators in a given quorum
 		for _, quorum := range a.quorums {
-			a.tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum, a.retrySyncNTimes)
+			a.tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum, a.RetrySyncNTimes)
 		}
 		a.logger.Info("Completed stake update. Check logs to make sure every quorum update succeeded successfully.")
 	} else {
@@ -120,7 +126,7 @@ func (a *AvsSync) updateStakes() {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), a.writerTimeoutDuration)
 		defer cancel()
 		// this one we update all quorums at once, since we're only updating a subset of operators (which should be a small number)
-		receipt, err := a.avsWriter.UpdateStakesOfOperatorSubsetForAllQuorums(timeoutCtx, a.operators)
+		receipt, err := a.AvsWriter.UpdateStakesOfOperatorSubsetForAllQuorums(timeoutCtx, a.operators)
 		if err != nil {
 			// no quorum label means we are updating all quorums
 			updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusError), "quorum": ""}).Inc()
@@ -143,7 +149,7 @@ func (a *AvsSync) maybeUpdateQuorumSet() {
 	a.logger.Info("Fetching quorum set dynamically")
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), a.readerTimeoutDuration)
 	defer cancel()
-	quorumCount, err := a.avsReader.GetQuorumCount(&bind.CallOpts{Context: timeoutCtx})
+	quorumCount, err := a.AvsReader.GetQuorumCount(&bind.CallOpts{Context: timeoutCtx})
 	if err != nil {
 		a.logger.Error("Error fetching quorum set dynamically", err)
 		return
@@ -165,7 +171,7 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 		defer cancel()
 		// we need to refetch the operator set because one reason for update stakes failing is that the operator set has changed
 		// in between us fetching it and trying to update it (the contract makes sure the entire operator set is updated and reverts if not)
-		operatorAddrsPerQuorum, err := a.avsReader.GetOperatorAddrsInQuorumsAtCurrentBlock(&bind.CallOpts{Context: timeoutCtx}, types.QuorumNums{types.QuorumNum(quorum)})
+		operatorAddrsPerQuorum, err := a.AvsReader.GetOperatorAddrsInQuorumsAtCurrentBlock(&bind.CallOpts{Context: timeoutCtx}, types.QuorumNums{types.QuorumNum(quorum)})
 		if err != nil {
 			a.logger.Warn("Error fetching operator addresses in quorums", "err", err, "quorum", quorum, "retryNTimes", retryNTimes, "try", i+1)
 			continue
@@ -179,7 +185,7 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 		a.logger.Infof("Updating stakes of operators in quorum %d: %v", int(quorum), operators)
 		timeoutCtx, cancel = context.WithTimeout(context.Background(), a.writerTimeoutDuration)
 		defer cancel()
-		receipt, err := a.avsWriter.UpdateStakesOfEntireOperatorSetForQuorums(timeoutCtx, [][]common.Address{operators}, types.QuorumNums{types.QuorumNum(quorum)})
+		receipt, err := a.AvsWriter.UpdateStakesOfEntireOperatorSetForQuorums(timeoutCtx, [][]common.Address{operators}, types.QuorumNums{types.QuorumNum(quorum)})
 		if err != nil {
 			a.logger.Warn("Error updating stakes of entire operator set for quorum", "err", err, "quorum", int(quorum), "retryNTimes", retryNTimes, "try", i+1)
 			continue

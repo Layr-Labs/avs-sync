@@ -1,4 +1,4 @@
-package main
+package avssync
 
 import (
 	"net/http"
@@ -40,5 +40,7 @@ func StartMetricsServer(metricsAddr string) {
 	registry.MustRegister(updateStakeAttempt, txRevertedTotal, operatorsUpdated)
 	http.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 	// not sure if we need to handle this error, since if metric server errors, then we will get alerts from grafana
-	go http.ListenAndServe(metricsAddr, nil)
+	go func() {
+		_ = http.ListenAndServe(metricsAddr, nil)
+	}()
 }
