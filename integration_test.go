@@ -103,64 +103,6 @@ func TestIntegrationUpdateSingleOperatorPath(t *testing.T) {
 
 // here we test the case where we call avsSync without a list of operators
 // although the operator set here consists of a single operator, the code path is different
-func TestIntegrationFullOperatorSet(t *testing.T) {
-
-	/* Start the anvil chain */
-	anvilC := startAnvilTestContainer()
-	// Not sure why but deferring anvilC.Terminate() causes a panic when the test finishes...
-	// so letting it terminate silently for now
-	anvilHttpEndpoint, err := anvilC.Endpoint(context.Background(), "http")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	contractAddresses := getContractAddressesFromContractRegistry(anvilHttpEndpoint)
-	operatorEcdsaPrivKeyHex := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-	operatorEcdsaPrivKey, err := crypto.HexToECDSA(operatorEcdsaPrivKeyHex)
-	if err != nil {
-		t.Fatal(err)
-	}
-	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivKey.PublicKey)
-	operatorBlsPrivKey := "0x1"
-	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{}, 0)
-	avsSync := c.avsSync
-
-	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
-	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
-
-	// get stake of operator before sync
-	operatorsPerQuorumBeforeSync, err := c.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// TODO: should be checking all operators, not just the first one
-	operatorStakeBeforeSync := operatorsPerQuorumBeforeSync[0][0].Stake
-
-	// deposit into strategy to create a diff between eigenlayer and avs stakes
-	depositAmount := big.NewInt(100)
-	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
-
-	// run avsSync
-	go avsSync.Start(context.Background())
-	time.Sleep(5 * time.Second)
-
-	// get stake of operator after sync
-	operatorsPerQuorumAfterSync, err := c.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
-	if err != nil {
-		t.Fatal(err)
-	}
-	operatorStakeAfterSync := operatorsPerQuorumAfterSync[0][0].Stake
-	operatorStakeDiff := new(big.Int).Sub(operatorStakeAfterSync, operatorStakeBeforeSync)
-
-	// we just check that the diff is equal to the deposited amount
-	if operatorStakeDiff.Cmp(depositAmount) != 0 {
-		t.Errorf("expected operator stake diff to be equal to deposit amount, got %v", operatorStakeDiff)
-	}
-
-}
-
-// here we test the case where we call avsSync without a list of operators
-// although the operator set here consists of a single operator, the code path is different
 // we force a retry by making the first updateOperator call faill
 // this would for eg happen if an operator registered between the moment we read the operator set and the moment we try to update the operator set
 // since the contract makes sure we are updating the full operator set
@@ -199,10 +141,10 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 	// run avsSync
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	go avsSync.Start(ctx)
+	avsSync.Start(ctx)
 }
 
-func TestSingleRun(t *testing.T) {
+func TestIntegrationFullOperatorSet(t *testing.T) {
 	/* Start the anvil chain */
 	anvilC := startAnvilTestContainer()
 	// Not sure why but deferring anvilC.Terminate() causes a panic when the test finishes...
