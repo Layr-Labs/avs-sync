@@ -349,7 +349,7 @@ func startAnvilTestContainer() testcontainers.Container {
 
 	ctx := context.Background()
 	req := testcontainers.ContainerRequest{
-		Image: "ghcr.io/foundry-rs/foundry:latest",
+		Image: "ghcr.io/foundry-rs/foundry:nightly-5b7e4cb3c882b28f3c32ba580de27ce7381f415a",
 		Mounts: testcontainers.ContainerMounts{
 			testcontainers.ContainerMount{
 				Source: testcontainers.GenericBindMountSource{
@@ -385,19 +385,15 @@ func advanceChainByNBlocks(n int, anvilC testcontainers.Container) {
 	}
 	rpcUrl := "http://" + anvilEndpoint
 	// this is just the first anvil address, which is funded so can send ether
-	address := "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-	privateKey := "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-	for i := 0; i < n; i++ {
-		// we just send a transaction to ourselves to advance the chain
-		cmd := exec.Command("bash", "-c",
-			fmt.Sprintf(
-				`cast send %s --value 0.01ether --private-key %s --rpc-url %s`,
-				address, privateKey, rpcUrl),
-		)
-		err = cmd.Run()
-		if err != nil {
-			panic(err)
-		}
+	// we just send a transaction to ourselves to advance the chain
+	cmd := exec.Command("bash", "-c",
+		fmt.Sprintf(
+			`cast rpc anvil_mine %d --rpc-url %s`,
+			n, rpcUrl),
+	)
+	err = cmd.Run()
+	if err != nil {
+		panic(err)
 	}
 }
 
