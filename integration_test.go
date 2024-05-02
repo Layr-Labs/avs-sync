@@ -65,7 +65,7 @@ func TestIntegrationUpdateSingleOperatorPath(t *testing.T) {
 	}
 	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivKey.PublicKey)
 	operatorBlsPrivKey := "0x1"
-	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{operatorAddr}, 30*time.Second)
+	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{operatorAddr}, 0)
 	avsSync := c.avsSync
 
 	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
@@ -122,7 +122,7 @@ func TestIntegrationFullOperatorSet(t *testing.T) {
 	}
 	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivKey.PublicKey)
 	operatorBlsPrivKey := "0x1"
-	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{}, 30*time.Second)
+	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{}, 0)
 	avsSync := c.avsSync
 
 	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
@@ -182,7 +182,7 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 	operatorBlsPrivKey := "0x1"
 	// we create avs sync and replace its avsWriter with a mock that will fail the first 2 times we call UpdateStakesOfEntireOperatorSetForQuorums
 	// and succeed on the third time
-	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{}, 30*time.Second)
+	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{}, 0)
 	avsSync := c.avsSync
 
 	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
@@ -198,8 +198,8 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 
 	// run avsSync
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	go avsSync.Start(ctx)
 	defer cancel()
+	go avsSync.Start(ctx)
 }
 
 func TestSingleRun(t *testing.T) {
@@ -329,8 +329,8 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 		[]byte{0},
 		false,
 		1, // 1 retry
-		5*time.Second,
-		5*time.Second,
+		time.Second,
+		time.Second,
 		"", // no metrics server (otherwise parallel tests all try to start server at same endpoint and error out)
 	)
 	return &AvsSyncComponents{
