@@ -83,7 +83,7 @@ func TestIntegrationUpdateSingleOperatorPath(t *testing.T) {
 	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
 
 	// run avsSync
-	go avsSync.Start()
+	go avsSync.Start(context.Background())
 	time.Sleep(5 * time.Second)
 
 	// get stake of operator after sync
@@ -141,7 +141,7 @@ func TestIntegrationFullOperatorSet(t *testing.T) {
 	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
 
 	// run avsSync
-	go avsSync.Start()
+	go avsSync.Start(context.Background())
 	time.Sleep(5 * time.Second)
 
 	// get stake of operator after sync
@@ -197,9 +197,9 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 	avsSync.RetrySyncNTimes = 3
 
 	// run avsSync
-	go avsSync.Start()
-	time.Sleep(5 * time.Second)
-
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	go avsSync.Start(ctx)
+	defer cancel()
 }
 
 func TestSingleRun(t *testing.T) {
@@ -239,7 +239,7 @@ func TestSingleRun(t *testing.T) {
 	depositAmount := big.NewInt(100)
 	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
 
-	avsSync.Start()
+	avsSync.Start(context.Background())
 
 	// get stake of operator after sync
 	operatorsPerQuorumAfterSync, err := avsSync.AvsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})

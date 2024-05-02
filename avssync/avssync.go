@@ -61,7 +61,7 @@ func NewAvsSync(
 	}
 }
 
-func (a *AvsSync) Start() {
+func (a *AvsSync) Start(ctx context.Context) {
 	// TODO: should prob put all of these in a config struct, to make sure we don't forget to print any of them
 	//       when we add new ones.
 	a.logger.Info("Avssync config",
@@ -97,9 +97,15 @@ func (a *AvsSync) Start() {
 	ticker := time.NewTicker(a.syncInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		a.updateStakes()
-		a.logger.Infof("Sleeping for %s", a.syncInterval)
+	for {
+		select {
+		case <-ctx.Done():
+			a.logger.Info("Context done, exiting")
+			return
+		case <-ticker.C:
+			a.updateStakes()
+			a.logger.Infof("Sleeping for %s", a.syncInterval)
+		}
 	}
 }
 

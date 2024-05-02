@@ -223,6 +223,6 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		cliCtx.String(MetricsAddrFlag.Name),
 	)
 
-	avsSync.Start()
+	avsSync.Start(context.Background())
 	return nil
 }
