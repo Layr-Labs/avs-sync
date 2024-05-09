@@ -3,6 +3,7 @@ package avssync
 import (
 	"net/http"
 
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -35,12 +36,32 @@ var (
 	}, []string{"quorum"})
 )
 
-func StartMetricsServer(metricsAddr string) {
+type Metrics struct {
+	registry *prometheus.Registry
+	addr     string
+	logger   logging.Logger
+}
+
+func NewMetrics(addr string, logger logging.Logger) *Metrics {
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(updateStakeAttempt, txRevertedTotal, operatorsUpdated)
-	http.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
-	// not sure if we need to handle this error, since if metric server errors, then we will get alerts from grafana
+
+	return &Metrics{
+		registry: registry,
+		addr:     addr,
+		logger:   logger,
+	}
+}
+
+func (m *Metrics) Start() {
 	go func() {
-		_ = http.ListenAndServe(metricsAddr, nil)
+		log := m.logger
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.HandlerFor(
+			m.registry,
+			promhttp.HandlerOpts{},
+		))
+		err := http.ListenAndServe(m.addr, mux)
+		log.Error("Prometheus server failed", "err", err)
 	}()
 }

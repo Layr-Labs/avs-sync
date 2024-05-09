@@ -208,6 +208,7 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		sleepBeforeFirstSyncDuration = firstSyncTime.Sub(now)
 	}
 	logger.Infof("Sleeping for %v before first sync, so that it happens at %v", sleepBeforeFirstSyncDuration, time.Now().Add(sleepBeforeFirstSyncDuration))
+	metrics := avssync.NewMetrics(cliCtx.String(MetricsAddrFlag.Name), logger)
 	avsSync := avssync.NewAvsSync(
 		logger,
 		avsReader,
@@ -220,7 +221,7 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		cliCtx.Int(retrySyncNTimes.Name),
 		readerTimeout,
 		writerTimeout,
-		cliCtx.String(MetricsAddrFlag.Name),
+		metrics,
 	)
 
 	avsSync.Start(context.Background())

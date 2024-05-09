@@ -273,7 +273,7 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 		1, // 1 retry
 		time.Second,
 		time.Second,
-		"", // no metrics server (otherwise parallel tests all try to start server at same endpoint and error out)
+		nil, // no metrics server (otherwise parallel tests all try to start server at same endpoint and error out)
 	)
 	return &AvsSyncComponents{
 		avsSync:   avsSync,

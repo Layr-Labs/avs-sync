@@ -29,7 +29,7 @@ type AvsSync struct {
 
 	readerTimeoutDuration time.Duration
 	writerTimeoutDuration time.Duration
-	prometheusServerAddr  string
+	metrics               *Metrics
 }
 
 // NewAvsSync creates a new AvsSync object
@@ -43,7 +43,7 @@ func NewAvsSync(
 	sleepBeforeFirstSyncDuration time.Duration, syncInterval time.Duration, operators []common.Address,
 	quorums []byte, fetchQuorumsDynamically bool, retrySyncNTimes int,
 	readerTimeoutDuration time.Duration, writerTimeoutDuration time.Duration,
-	prometheusServerAddr string,
+	metrics *Metrics,
 ) *AvsSync {
 	return &AvsSync{
 		AvsReader:                    avsReader,
@@ -57,13 +57,17 @@ func NewAvsSync(
 		fetchQuorumsDynamically:      fetchQuorumsDynamically,
 		readerTimeoutDuration:        readerTimeoutDuration,
 		writerTimeoutDuration:        writerTimeoutDuration,
-		prometheusServerAddr:         prometheusServerAddr,
+		metrics:                      metrics,
 	}
 }
 
 func (a *AvsSync) Start(ctx context.Context) {
 	// TODO: should prob put all of these in a config struct, to make sure we don't forget to print any of them
 	//       when we add new ones.
+	prometheusServerAddr := ""
+	if a.metrics != nil {
+		prometheusServerAddr = a.metrics.addr
+	}
 	a.logger.Info("Avssync config",
 		"sleepBeforeFirstSyncDuration", a.sleepBeforeFirstSyncDuration,
 		"syncInterval", a.syncInterval,
@@ -72,13 +76,13 @@ func (a *AvsSync) Start(ctx context.Context) {
 		"fetchQuorumsDynamically", a.fetchQuorumsDynamically,
 		"readerTimeoutDuration", a.readerTimeoutDuration,
 		"writerTimeoutDuration", a.writerTimeoutDuration,
-		"prometheusServerAddr", a.prometheusServerAddr,
+		"prometheusServerAddr", prometheusServerAddr,
 	)
 
-	if a.prometheusServerAddr != "" {
-		StartMetricsServer(a.prometheusServerAddr)
+	if a.metrics != nil {
+		a.metrics.Start()
 	} else {
-		a.logger.Info("Prometheus server address not set, not starting metrics server")
+		a.logger.Warn("Metrics not set, not starting metrics server")
 	}
 
 	// ticker doesn't tick immediately, so we send a first updateStakes here
