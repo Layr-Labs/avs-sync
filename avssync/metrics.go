@@ -44,6 +44,8 @@ func NewMetrics(reg *prometheus.Registry) *Metrics {
 			Name:      "operators_updated",
 			Help:      "The total number of operators updated (during the last quorum sync)",
 		}, []string{"quorum"}),
+
+		registry: reg,
 	}
 
 	return metrics

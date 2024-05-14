@@ -45,9 +45,9 @@ func NewAvsSync(
 	quorums []byte, fetchQuorumsDynamically bool, retrySyncNTimes int,
 	readerTimeoutDuration time.Duration, writerTimeoutDuration time.Duration,
 	prometheusServerAddr string,
+	prometheusRegistry *prometheus.Registry,
 ) *AvsSync {
-	promReg := prometheus.NewRegistry()
-	metrics := NewMetrics(promReg)
+	metrics := NewMetrics(prometheusRegistry, prometheusServerAddr)
 
 	return &AvsSync{
 		AvsReader:                    avsReader,
