@@ -18,28 +18,28 @@ const (
 )
 
 type Metrics struct {
-	UpdateStakeAttempts *prometheus.CounterVec
-	TxRevertedTotal     prometheus.Counter
-	OperatorsUpdated    *prometheus.GaugeVec
+	updateStakeAttempts *prometheus.CounterVec
+	txRevertedTotal     prometheus.Counter
+	operatorsUpdated    *prometheus.GaugeVec
 
 	registry *prometheus.Registry
 }
 
 func NewMetrics(reg *prometheus.Registry) *Metrics {
 	metrics := &Metrics{
-		UpdateStakeAttempts: promauto.With(reg).NewCounterVec(prometheus.CounterOpts{
+		updateStakeAttempts: promauto.With(reg).NewCounterVec(prometheus.CounterOpts{
 			Namespace: metricsNamespace,
 			Name:      "update_stake_attempt",
 			Help:      "Result from an update stake attempt. Either succeed or error (either tx was mined but reverted, or failed to get processed by chain).",
 		}, []string{"status", "quorum"}),
 
-		TxRevertedTotal: promauto.With(reg).NewCounter(prometheus.CounterOpts{
+		txRevertedTotal: promauto.With(reg).NewCounter(prometheus.CounterOpts{
 			Namespace: metricsNamespace,
 			Name:      "tx_reverted_total",
 			Help:      "The total number of transactions that made it onchain but reverted (most likely because out of gas)",
 		}),
 
-		OperatorsUpdated: promauto.With(reg).NewGaugeVec(prometheus.GaugeOpts{
+		operatorsUpdated: promauto.With(reg).NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: metricsNamespace,
 			Name:      "operators_updated",
 			Help:      "The total number of operators updated (during the last quorum sync)",
@@ -51,17 +51,16 @@ func NewMetrics(reg *prometheus.Registry) *Metrics {
 	return metrics
 }
 
-func (g *Metrics) UpdateStakeAttempt(status UpdateStakeStatus, quorum string) {
-	g.UpdateStakeAttempts.WithLabelValues(string(status), quorum).Inc()
+func (g *Metrics) UpdateStakeAttemptInc(status UpdateStakeStatus, quorum string) {
+	g.updateStakeAttempts.WithLabelValues(string(status), quorum).Inc()
 }
 
 func (g *Metrics) TxRevertedTotalInc() {
-	g.TxRevertedTotal.Inc()
+	g.txRevertedTotal.Inc()
 }
 
-// operatorsUpdated.With(prometheus.Labels{"quorum": strconv.Itoa(int(quorum))}).Set(float64(len(operators)))
 func (g *Metrics) OperatorsUpdatedSet(quorum string, operators int) {
-	g.OperatorsUpdated.WithLabelValues(quorum).Set(float64(operators))
+	g.operatorsUpdated.WithLabelValues(quorum).Set(float64(operators))
 }
 
 func (g *Metrics) Start(metricsAddr string) {

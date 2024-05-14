@@ -47,7 +47,7 @@ func NewAvsSync(
 	prometheusServerAddr string,
 	prometheusRegistry *prometheus.Registry,
 ) *AvsSync {
-	metrics := NewMetrics(prometheusRegistry, prometheusServerAddr)
+	metrics := NewMetrics(prometheusRegistry)
 
 	return &AvsSync{
 		AvsReader:                    avsReader,
@@ -135,7 +135,7 @@ func (a *AvsSync) updateStakes() {
 		if err != nil {
 			// no quorum label means we are updating all quorums
 			for _, quorum := range a.quorums {
-				a.Metrics.UpdateStakeAttempt(UpdateStakeStatusError, strconv.Itoa(int(quorum)))
+				a.Metrics.UpdateStakeAttemptInc(UpdateStakeStatusError, strconv.Itoa(int(quorum)))
 			}
 			a.logger.Error("Error updating stakes of operator subset for all quorums", err)
 			return
@@ -203,14 +203,14 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 		}
 
 		// Update metrics on success
-		a.Metrics.UpdateStakeAttempt(UpdateStakeStatusSucceed, strconv.Itoa(int(quorum)))
+		a.Metrics.UpdateStakeAttemptInc(UpdateStakeStatusSucceed, strconv.Itoa(int(quorum)))
 		a.Metrics.OperatorsUpdatedSet(strconv.Itoa(int(quorum)), len(operators))
 
 		return
 	}
 
 	// Update metrics on failure
-	a.Metrics.UpdateStakeAttempt(UpdateStakeStatusError, strconv.Itoa(int(quorum)))
+	a.Metrics.UpdateStakeAttemptInc(UpdateStakeStatusError, strconv.Itoa(int(quorum)))
 	a.logger.Error("Giving up after retrying", "retryNTimes", retryNTimes)
 }
 
