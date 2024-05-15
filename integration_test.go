@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"go.uber.org/mock/gomock"
@@ -274,6 +275,7 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 		time.Second,
 		time.Second,
 		"", // no metrics server (otherwise parallel tests all try to start server at same endpoint and error out)
+		prometheus.NewRegistry(),
 	)
 	return &AvsSyncComponents{
 		avsSync:   avsSync,

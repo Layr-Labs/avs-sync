@@ -19,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli"
 )
 
@@ -208,6 +209,10 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		sleepBeforeFirstSyncDuration = firstSyncTime.Sub(now)
 	}
 	logger.Infof("Sleeping for %v before first sync, so that it happens at %v", sleepBeforeFirstSyncDuration, time.Now().Add(sleepBeforeFirstSyncDuration))
+
+	// Create new prometheus registry
+	reg := prometheus.NewRegistry()
+
 	avsSync := avssync.NewAvsSync(
 		logger,
 		avsReader,
@@ -221,6 +226,7 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		readerTimeout,
 		writerTimeout,
 		cliCtx.String(MetricsAddrFlag.Name),
+		reg,
 	)
 
 	avsSync.Start(context.Background())

@@ -30,6 +30,7 @@ type AvsSync struct {
 	readerTimeoutDuration time.Duration
 	writerTimeoutDuration time.Duration
 	prometheusServerAddr  string
+	Metrics               *Metrics
 }
 
 // NewAvsSync creates a new AvsSync object
@@ -44,7 +45,10 @@ func NewAvsSync(
 	quorums []byte, fetchQuorumsDynamically bool, retrySyncNTimes int,
 	readerTimeoutDuration time.Duration, writerTimeoutDuration time.Duration,
 	prometheusServerAddr string,
+	prometheusRegistry *prometheus.Registry,
 ) *AvsSync {
+	metrics := NewMetrics(prometheusRegistry)
+
 	return &AvsSync{
 		AvsReader:                    avsReader,
 		AvsWriter:                    avsWriter,
@@ -58,6 +62,7 @@ func NewAvsSync(
 		readerTimeoutDuration:        readerTimeoutDuration,
 		writerTimeoutDuration:        writerTimeoutDuration,
 		prometheusServerAddr:         prometheusServerAddr,
+		Metrics:                      metrics,
 	}
 }
 
@@ -76,7 +81,7 @@ func (a *AvsSync) Start(ctx context.Context) {
 	)
 
 	if a.prometheusServerAddr != "" {
-		StartMetricsServer(a.prometheusServerAddr)
+		a.Metrics.Start(a.prometheusServerAddr)
 	} else {
 		a.logger.Info("Prometheus server address not set, not starting metrics server")
 	}
@@ -129,11 +134,13 @@ func (a *AvsSync) updateStakes() {
 		receipt, err := a.AvsWriter.UpdateStakesOfOperatorSubsetForAllQuorums(timeoutCtx, a.operators)
 		if err != nil {
 			// no quorum label means we are updating all quorums
-			updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusError), "quorum": ""}).Inc()
+			for _, quorum := range a.quorums {
+				a.Metrics.UpdateStakeAttemptInc(UpdateStakeStatusError, strconv.Itoa(int(quorum)))
+			}
 			a.logger.Error("Error updating stakes of operator subset for all quorums", err)
 			return
 		} else if receipt.Status == gethtypes.ReceiptStatusFailed {
-			txRevertedTotal.Inc()
+			a.Metrics.TxRevertedTotalInc()
 			a.logger.Error("Update stakes of operator subset for all quorums reverted")
 			return
 		}
@@ -178,7 +185,6 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 		}
 		var operators []common.Address
 		operators = append(operators, operatorAddrsPerQuorum[0]...)
-		operatorsUpdated.With(prometheus.Labels{"quorum": strconv.Itoa(int(quorum))}).Set(float64(len(operators)))
 		sort.Slice(operators, func(i, j int) bool {
 			return operators[i].Big().Cmp(operators[j].Big()) < 0
 		})
@@ -191,14 +197,20 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 			continue
 		}
 		if receipt.Status == gethtypes.ReceiptStatusFailed {
-			txRevertedTotal.Inc()
+			a.Metrics.TxRevertedTotalInc()
 			a.logger.Error("Update stakes of entire operator set for quorum reverted", "quorum", int(quorum))
 			continue
 		}
-		updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusSucceed), "quorum": strconv.Itoa(int(quorum))}).Inc()
+
+		// Update metrics on success
+		a.Metrics.UpdateStakeAttemptInc(UpdateStakeStatusSucceed, strconv.Itoa(int(quorum)))
+		a.Metrics.OperatorsUpdatedSet(strconv.Itoa(int(quorum)), len(operators))
+
 		return
 	}
-	updateStakeAttempt.With(prometheus.Labels{"status": string(UpdateStakeStatusError), "quorum": strconv.Itoa(int(quorum))}).Inc()
+
+	// Update metrics on failure
+	a.Metrics.UpdateStakeAttemptInc(UpdateStakeStatusError, strconv.Itoa(int(quorum)))
 	a.logger.Error("Giving up after retrying", "retryNTimes", retryNTimes)
 }
 
