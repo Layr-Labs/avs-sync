@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -26,6 +27,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
+	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
 	"github.com/Layr-Labs/eigensdk-go/types"
 
@@ -213,14 +215,17 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 	}
 	ecdsaAddr := crypto.PubkeyToAddress(ecdsaPrivKey.PublicKey)
 
-	ethHttpClient, err := eth.NewInstrumentedClient(anvilHttpEndpoint, nil)
+	reg := prometheus.NewRegistry()
+	rpcCollector := rpccalls.NewCollector("", reg)
+
+	ethInstrumentedHttpClient, err := eth.NewInstrumentedClient(anvilHttpEndpoint, rpcCollector)
 	if err != nil {
 		panic(err)
 	}
 
 	rpcCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	chainid, err := ethHttpClient.ChainID(rpcCtx)
+	chainid, err := ethInstrumentedHttpClient.ChainID(rpcCtx)
 	if err != nil {
 		panic(err)
 	}
@@ -231,18 +236,18 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 	if err != nil {
 		panic(err)
 	}
-	wallet, err := walletsdk.NewPrivateKeyWallet(ethHttpClient, signerFn, ecdsaAddr, logger)
+	wallet, err := walletsdk.NewPrivateKeyWallet(ethInstrumentedHttpClient, signerFn, ecdsaAddr, logger)
 	if err != nil {
 		panic(err)
 	}
 
-	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, ecdsaAddr)
+	txMgr := txmgr.NewSimpleTxManager(wallet, ethInstrumentedHttpClient, logger, ecdsaAddr)
 
 	avsWriter, err := avsregistry.BuildAvsRegistryChainWriter(
 		contractAddresses.RegistryCoordinator,
 		contractAddresses.OperatorStateRetriever,
 		logger,
-		ethHttpClient,
+		ethInstrumentedHttpClient,
 		txMgr,
 	)
 	if err != nil {
@@ -251,7 +256,7 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 	avsReader, err := avsregistry.BuildAvsRegistryChainReader(
 		contractAddresses.RegistryCoordinator,
 		contractAddresses.OperatorStateRetriever,
-		ethHttpClient,
+		ethInstrumentedHttpClient,
 		logger,
 	)
 	if err != nil {
@@ -272,7 +277,7 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 		time.Second,
 		time.Second,
 		"", // no metrics server (otherwise parallel tests all try to start server at same endpoint and error out)
-		prometheus.NewRegistry(),
+		reg,
 	)
 	return &AvsSyncComponents{
 		avsSync:   avsSync,
@@ -340,7 +345,7 @@ func advanceChainByNBlocks(n int, anvilC testcontainers.Container) {
 
 // TODO(samlaf): move this function to eigensdk
 func registerOperatorWithAvs(wallet walletsdk.Wallet, ethHttpUrl string, contractAddresses ContractAddresses, ecdsaPrivKeyHex string, blsPrivKeyHex string) {
-	ethHttpClient, err := eth.NewInstrumentedClient(ethHttpUrl, nil)
+	ethHttpClient, err := NewEthHttpClient(ethHttpUrl)
 	if err != nil {
 		panic(err)
 	}
@@ -404,7 +409,7 @@ func depositErc20IntoStrategyForOperator(
 	operatorAddressHex string,
 	amount *big.Int,
 ) {
-	ethHttpClient, err := eth.NewInstrumentedClient(ethHttpUrl, nil)
+	ethHttpClient, err := NewEthHttpClient(ethHttpUrl)
 	if err != nil {
 		panic(err)
 	}
@@ -441,7 +446,7 @@ func depositErc20IntoStrategyForOperator(
 }
 
 func getContractAddressesFromContractRegistry(ethHttpUrl string) ContractAddresses {
-	ethHttpClient, err := eth.NewInstrumentedClient(ethHttpUrl, nil)
+	ethHttpClient, err := NewEthHttpClient(ethHttpUrl)
 	if err != nil {
 		panic(err)
 	}
@@ -473,4 +478,13 @@ func getContractAddressesFromContractRegistry(ethHttpUrl string) ContractAddress
 		DelegationManager:      delegationManagerAddr,
 		Erc20MockStrategy:      erc20MockStrategyAddr,
 	}
+}
+
+func NewEthHttpClient(rpcAddress string) (*ethclient.Client, error) {
+	client, err := ethclient.Dial(rpcAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
 }
