@@ -274,8 +274,8 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 		[]byte{0},
 		false,
 		1, // 1 retry
-		time.Second,
-		time.Second,
+		5*time.Second,
+		5*time.Second,
 		"", // no metrics server (otherwise parallel tests all try to start server at same endpoint and error out)
 		reg,
 	)
@@ -319,7 +319,8 @@ func startAnvilTestContainer() testcontainers.Container {
 	// this is needed temporarily because anvil restarts at 0 block when we load a state...
 	// see comment in start-anvil-chain-with-el-and-avs-deployed.sh
 	// 25 is arbitrary, but I think it's enough (not sure at which block exactly deployment happened)
-	//advanceChainByNBlocks(25, anvilC)
+	// this is still needed as of the latest stable anvil
+	advanceChainByNBlocks(25, anvilC)
 
 	return anvilC
 }
