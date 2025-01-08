@@ -16,8 +16,8 @@ import (
 )
 
 type AvsSync struct {
-	AvsReader       avsregistry.AvsRegistryReader
-	AvsWriter       avsregistry.AvsRegistryWriter
+	AvsReader       *avsregistry.ChainReader
+	AvsWriter       *avsregistry.ChainWriter
 	RetrySyncNTimes int
 
 	logger                       sdklogging.Logger
@@ -40,7 +40,7 @@ type AvsSync struct {
 //	fetchQuorumsDynamically - if true, fetch the list of quorums registered in the contract and update all of them (only needed if operators is not empty)
 func NewAvsSync(
 	logger sdklogging.Logger,
-	avsReader avsregistry.AvsRegistryReader, avsWriter avsregistry.AvsRegistryWriter,
+	avsReader *avsregistry.ChainReader, avsWriter *avsregistry.ChainWriter,
 	sleepBeforeFirstSyncDuration time.Duration, syncInterval time.Duration, operators []common.Address,
 	quorums []byte, fetchQuorumsDynamically bool, retrySyncNTimes int,
 	readerTimeoutDuration time.Duration, writerTimeoutDuration time.Duration,
@@ -131,7 +131,7 @@ func (a *AvsSync) updateStakes() {
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), a.writerTimeoutDuration)
 		defer cancel()
 		// this one we update all quorums at once, since we're only updating a subset of operators (which should be a small number)
-		receipt, err := a.AvsWriter.UpdateStakesOfOperatorSubsetForAllQuorums(timeoutCtx, a.operators)
+		receipt, err := a.AvsWriter.UpdateStakesOfOperatorSubsetForAllQuorums(timeoutCtx, a.operators, true)
 		if err != nil {
 			// no quorum label means we are updating all quorums
 			for _, quorum := range a.quorums {
@@ -191,7 +191,7 @@ func (a *AvsSync) tryNTimesUpdateStakesOfEntireOperatorSetForQuorum(quorum byte,
 		a.logger.Infof("Updating stakes of operators in quorum %d: %v", int(quorum), operators)
 		timeoutCtx, cancel = context.WithTimeout(context.Background(), a.writerTimeoutDuration)
 		defer cancel()
-		receipt, err := a.AvsWriter.UpdateStakesOfEntireOperatorSetForQuorums(timeoutCtx, [][]common.Address{operators}, types.QuorumNums{types.QuorumNum(quorum)})
+		receipt, err := a.AvsWriter.UpdateStakesOfEntireOperatorSetForQuorums(timeoutCtx, [][]common.Address{operators}, types.QuorumNums{types.QuorumNum(quorum)}, true)
 		if err != nil {
 			a.logger.Warn("Error updating stakes of entire operator set for quorum", "err", err, "quorum", int(quorum), "retryNTimes", retryNTimes, "try", i+1)
 			continue
