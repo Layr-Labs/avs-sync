@@ -365,40 +365,28 @@ type AvsSyncComponents struct {
 
 func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddresses ContractAddresses, operators []common.Address, syncInterval time.Duration) *AvsSyncComponents {
 	logger, err := logging.NewZapLogger(logging.Development)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	ecdsaPrivKey, err := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	ecdsaAddr := crypto.PubkeyToAddress(ecdsaPrivKey.PublicKey)
 
 	reg := prometheus.NewRegistry()
 	rpcCollector := rpccalls.NewCollector("", reg)
 
 	ethInstrumentedHttpClient, err := eth.NewInstrumentedClient(anvilHttpEndpoint, rpcCollector)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	rpcCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	chainid, err := ethInstrumentedHttpClient.ChainID(rpcCtx)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	// confusing interface, see https://github.com/Layr-Labs/eigensdk-go/issues/90
 	signerFn, _, err := signerv2.SignerFromConfig(signerv2.Config{
 		PrivateKey: ecdsaPrivKey,
 	}, chainid)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	wallet, err := walletsdk.NewPrivateKeyWallet(ethInstrumentedHttpClient, signerFn, ecdsaAddr, logger)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	txMgr := txmgr.NewSimpleTxManager(wallet, ethInstrumentedHttpClient, logger, ecdsaAddr)
 
@@ -409,9 +397,7 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 		ethInstrumentedHttpClient,
 		txMgr,
 	)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	avsReader, err := avsregistry.BuildAvsRegistryChainReader(
 		contractAddresses.RegistryCoordinator,
 		contractAddresses.OperatorStateRetriever,
@@ -448,9 +434,7 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 
 func startAnvilTestContainer(additionalFlags ...string) testcontainers.Container {
 	integrationDir, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	cmdArgs := []string{
 		"--host", "0.0.0.0",
@@ -479,9 +463,7 @@ func startAnvilTestContainer(additionalFlags ...string) testcontainers.Container
 		ContainerRequest: req,
 		Started:          true,
 	})
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	// this is needed temporarily because anvil restarts at 0 block when we load a state...
 	// see comment in start-anvil-chain-with-el-and-avs-deployed.sh
@@ -494,9 +476,7 @@ func startAnvilTestContainer(additionalFlags ...string) testcontainers.Container
 
 func advanceChainByNBlocks(n int, anvilC testcontainers.Container) {
 	anvilEndpoint, err := anvilC.Endpoint(context.Background(), "")
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	rpcUrl := "http://" + anvilEndpoint
 	// this is just the first anvil address, which is funded so can send ether
 	// we just send a transaction to ourselves to advance the chain
@@ -506,31 +486,21 @@ func advanceChainByNBlocks(n int, anvilC testcontainers.Container) {
 			n, rpcUrl),
 	)
 	err = cmd.Run()
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 }
 
 // TODO(samlaf): move this function to eigensdk
 func registerOperatorWithAvs(wallet walletsdk.Wallet, ethHttpUrl string, contractAddresses ContractAddresses, ecdsaPrivKeyHex string, blsPrivKeyHex string, waitForMine bool) {
 	ethHttpClient, err := ethclient.Dial(ethHttpUrl)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	blsKeyPair, err := bls.NewKeyPairFromString(blsPrivKeyHex)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	ecdsaPrivKey, err := crypto.HexToECDSA(ecdsaPrivKeyHex)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	ecdsaAddr := crypto.PubkeyToAddress(ecdsaPrivKey.PublicKey)
 
 	logger, err := logging.NewZapLogger(logging.Development)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, ecdsaAddr)
 
 	avsWriter, err := avsregistry.BuildAvsRegistryChainWriter(
@@ -540,21 +510,15 @@ func registerOperatorWithAvs(wallet walletsdk.Wallet, ethHttpUrl string, contrac
 		ethHttpClient,
 		txMgr,
 	)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	quorumNumbers := []types.QuorumNum{0}
 	socket := "Not Needed"
 	operatorToAvsRegistrationSigSalt := [32]byte{123}
 	curBlockNum, err := ethHttpClient.BlockNumber(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	curBlock, err := ethHttpClient.BlockByNumber(context.Background(), big.NewInt(int64(curBlockNum)))
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	sigValidForSeconds := int64(1_000_000)
 	operatorToAvsRegistrationSigExpiry := big.NewInt(int64(curBlock.Time()) + sigValidForSeconds)
 	_, err = avsWriter.RegisterOperatorInQuorumWithAVSRegistryCoordinator(
@@ -562,9 +526,7 @@ func registerOperatorWithAvs(wallet walletsdk.Wallet, ethHttpUrl string, contrac
 		ecdsaPrivKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry,
 		blsKeyPair, quorumNumbers, socket, waitForMine,
 	)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 }
 
 // TODO(samlaf): move this function to eigensdk
@@ -579,19 +541,13 @@ func depositErc20IntoStrategyForOperator(
 	waitForMined bool,
 ) {
 	ethHttpClient, err := ethclient.Dial(ethHttpUrl)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	ecdsaPrivKey, err := crypto.HexToECDSA(ecdsaPrivKeyHex)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	ecdsaAddr := crypto.PubkeyToAddress(ecdsaPrivKey.PublicKey)
 
 	logger, err := logging.NewZapLogger(logging.Development)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	noopMetrics := metrics.NewNoopMetrics()
 
 	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, ecdsaAddr)
@@ -603,44 +559,28 @@ func depositErc20IntoStrategyForOperator(
 		noopMetrics,
 		txMgr,
 	)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	_, err = elWriter.DepositERC20IntoStrategy(context.Background(), erc20MockStrategyAddr, amount, waitForMined)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 }
 
 func getContractAddressesFromContractRegistry(ethHttpUrl string) ContractAddresses {
 	ethHttpClient, err := ethclient.Dial(ethHttpUrl)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	// The ContractsRegistry contract should always be deployed at this address on anvil
 	// it's the address of the contract created at nonce 0 by the first anvil account (0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266)
 	contractsRegistry, err := contractreg.NewContractContractsRegistry(common.HexToAddress("0x5FbDB2315678afecb367f032d93F642f64180aa3"), ethHttpClient)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	registryCoordinatorAddr, err := contractsRegistry.Contracts(&bind.CallOpts{}, "eigencertRegistryCoordinator")
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	operatorStateRetrieverAddr, err := contractsRegistry.Contracts(&bind.CallOpts{}, "eigencertOperatorStateRetriever")
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	delegationManagerAddr, err := contractsRegistry.Contracts(&bind.CallOpts{}, "delegationManager")
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	erc20MockStrategyAddr, err := contractsRegistry.Contracts(&bind.CallOpts{}, "erc20MockStrategy")
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	return ContractAddresses{
 		RegistryCoordinator:    registryCoordinatorAddr,
 		OperatorStateRetriever: operatorStateRetrieverAddr,
@@ -651,9 +591,7 @@ func getContractAddressesFromContractRegistry(ethHttpUrl string) ContractAddress
 
 func createWalletForOperator(t *testing.T, privKeyHex string, ethClient *ethclient.Client) walletsdk.Wallet {
 	logger, err := logging.NewZapLogger(logging.Development)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	ecdsaPrivKey, err := crypto.HexToECDSA(privKeyHex)
 	if err != nil {
@@ -662,9 +600,7 @@ func createWalletForOperator(t *testing.T, privKeyHex string, ethClient *ethclie
 	ecdsaAddr := crypto.PubkeyToAddress(ecdsaPrivKey.PublicKey)
 
 	chainID, err := ethClient.ChainID(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	signerFn, _, err := signerv2.SignerFromConfig(signerv2.Config{
 		PrivateKey: ecdsaPrivKey,
