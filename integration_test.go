@@ -102,7 +102,8 @@ func TestIntegrationUpdateSingleOperatorPath(t *testing.T) {
 
 }
 
-func TestIntegrationFullOperatorSetWithRaceConditionFails(t *testing.T) {
+// Simulating an operator registered between the moment we read the operator set and the moment we try to update the operator set to ensure this behaves as expected
+func TestIntegrationFullOperatorSetWithRaceConditionFailsToUpdate(t *testing.T) {
 	/* Start the anvil chain with no mining and FIFO transaction ordering to be able to force retries */
 	anvilC := startAnvilTestContainer("--order", "fifo", "--no-mining")
 	anvilHttpEndpoint, err := anvilC.Endpoint(context.Background(), "http")
@@ -187,6 +188,9 @@ func TestIntegrationFullOperatorSetWithRaceConditionFails(t *testing.T) {
 	}
 	operatorStakeAfterSync := operatorsPerQuorumAfterSync[0][0].Stake
 
+	fmt.Printf("Stake before sync: %v\n", operatorStakeBeforeSync)
+	fmt.Printf("Stake after sync: %v\n", operatorStakeAfterSync)
+
 	// we check that the stake before and after the sync are the same despite the deposit happening
 	if operatorStakeBeforeSync.Cmp(operatorStakeAfterSync) != 0 {
 		fmt.Printf("%v", operatorStakeAfterSync)
@@ -254,7 +258,7 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 
 	// Mine another block to include operator2's registration then wait for update
 	advanceChainByNBlocks(1, anvilC)
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	// Mine Block to include update
 	advanceChainByNBlocks(1, anvilC)
@@ -297,39 +301,6 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 		t.Errorf("expected operator stake diff to be equal to deposit amount, got %v", operatorStakeDiff)
 	}
 
-}
-
-// Helper function to create a wallet for an operator
-func createWalletForOperator(t *testing.T, privKeyHex string, ethClient *ethclient.Client) walletsdk.Wallet {
-	logger, err := logging.NewZapLogger(logging.Development)
-	if err != nil {
-		panic(err)
-	}
-
-	ecdsaPrivKey, err := crypto.HexToECDSA(privKeyHex)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ecdsaAddr := crypto.PubkeyToAddress(ecdsaPrivKey.PublicKey)
-
-	chainID, err := ethClient.ChainID(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
-	signerFn, _, err := signerv2.SignerFromConfig(signerv2.Config{
-		PrivateKey: ecdsaPrivKey,
-	}, chainID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	wallet, err := walletsdk.NewPrivateKeyWallet(ethClient, signerFn, ecdsaAddr, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return wallet
 }
 
 func TestIntegrationFullOperatorSet(t *testing.T) {
@@ -685,4 +656,36 @@ func NewEthHttpClient(rpcAddress string) (*ethclient.Client, error) {
 	}
 
 	return client, nil
+}
+
+func createWalletForOperator(t *testing.T, privKeyHex string, ethClient *ethclient.Client) walletsdk.Wallet {
+	logger, err := logging.NewZapLogger(logging.Development)
+	if err != nil {
+		panic(err)
+	}
+
+	ecdsaPrivKey, err := crypto.HexToECDSA(privKeyHex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ecdsaAddr := crypto.PubkeyToAddress(ecdsaPrivKey.PublicKey)
+
+	chainID, err := ethClient.ChainID(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	signerFn, _, err := signerv2.SignerFromConfig(signerv2.Config{
+		PrivateKey: ecdsaPrivKey,
+	}, chainID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wallet, err := walletsdk.NewPrivateKeyWallet(ethClient, signerFn, ecdsaAddr, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return wallet
 }
