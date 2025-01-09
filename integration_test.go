@@ -513,7 +513,7 @@ func advanceChainByNBlocks(n int, anvilC testcontainers.Container) {
 
 // TODO(samlaf): move this function to eigensdk
 func registerOperatorWithAvs(wallet walletsdk.Wallet, ethHttpUrl string, contractAddresses ContractAddresses, ecdsaPrivKeyHex string, blsPrivKeyHex string, waitForMine bool) {
-	ethHttpClient, err := NewEthHttpClient(ethHttpUrl)
+	ethHttpClient, err := ethclient.Dial(ethHttpUrl)
 	if err != nil {
 		panic(err)
 	}
@@ -578,7 +578,7 @@ func depositErc20IntoStrategyForOperator(
 	amount *big.Int,
 	waitForMined bool,
 ) {
-	ethHttpClient, err := NewEthHttpClient(ethHttpUrl)
+	ethHttpClient, err := ethclient.Dial(ethHttpUrl)
 	if err != nil {
 		panic(err)
 	}
@@ -615,7 +615,7 @@ func depositErc20IntoStrategyForOperator(
 }
 
 func getContractAddressesFromContractRegistry(ethHttpUrl string) ContractAddresses {
-	ethHttpClient, err := NewEthHttpClient(ethHttpUrl)
+	ethHttpClient, err := ethclient.Dial(ethHttpUrl)
 	if err != nil {
 		panic(err)
 	}
@@ -647,15 +647,6 @@ func getContractAddressesFromContractRegistry(ethHttpUrl string) ContractAddress
 		DelegationManager:      delegationManagerAddr,
 		Erc20MockStrategy:      erc20MockStrategyAddr,
 	}
-}
-
-func NewEthHttpClient(rpcAddress string) (*ethclient.Client, error) {
-	client, err := ethclient.Dial(rpcAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
 }
 
 func createWalletForOperator(t *testing.T, privKeyHex string, ethClient *ethclient.Client) walletsdk.Wallet {
