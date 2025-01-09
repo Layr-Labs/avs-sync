@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
@@ -69,7 +70,7 @@ func TestIntegrationUpdateSingleOperatorPath(t *testing.T) {
 	avsSync := c.avsSync
 
 	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
-	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
+	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey, true)
 
 	// get stake of operator before sync
 	operatorsPerQuorumBeforeSync, err := c.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
@@ -80,7 +81,7 @@ func TestIntegrationUpdateSingleOperatorPath(t *testing.T) {
 
 	// deposit into strategy to create a diff between eigenlayer and avs stakes
 	depositAmount := big.NewInt(100)
-	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
+	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount, false)
 
 	// run avsSync
 	go avsSync.Start(context.Background())
@@ -101,47 +102,234 @@ func TestIntegrationUpdateSingleOperatorPath(t *testing.T) {
 
 }
 
+func TestIntegrationFullOperatorSetWithRaceConditionFails(t *testing.T) {
+	/* Start the anvil chain with no mining and FIFO transaction ordering to be able to force retries */
+	anvilC := startAnvilTestContainer("--order", "fifo", "--no-mining")
+	anvilHttpEndpoint, err := anvilC.Endpoint(context.Background(), "http")
+	require.NoError(t, err)
+
+	contractAddresses := getContractAddressesFromContractRegistry(anvilHttpEndpoint)
+
+	ethClient, err := ethclient.Dial(anvilHttpEndpoint)
+	require.NoError(t, err)
+
+	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{}, 0)
+	c.avsSync.RetrySyncNTimes = 1
+
+	operator1EcdsaPrivKeyHex := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+	operator1Addr := crypto.PubkeyToAddress(crypto.ToECDSAUnsafe(common.FromHex(operator1EcdsaPrivKeyHex)).PublicKey)
+	operator1BlsPrivKey := "0x1"
+
+	operator2EcdsaPrivKeyHex := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+	operator2BlsPrivKey := "0x2"
+	operator2Addr := crypto.PubkeyToAddress(crypto.ToECDSAUnsafe(common.FromHex(operator2EcdsaPrivKeyHex)).PublicKey)
+	operator2Wallet := createWalletForOperator(t, operator2EcdsaPrivKeyHex, ethClient)
+
+	// Register first operator
+	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operator1EcdsaPrivKeyHex, operator1BlsPrivKey, false)
+
+	// mine block
+	advanceChainByNBlocks(1, anvilC)
+
+	// get state pre sync
+	operatorsPerQuorumBeforeSync, err := c.avsSync.AvsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	operatorStakeBeforeSync := operatorsPerQuorumBeforeSync[0][0].Stake
+
+	// deposit into strategy to create a diff between eigenlayer and avs stakes
+	depositAmount := big.NewInt(100)
+	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operator1EcdsaPrivKeyHex, operator1Addr.Hex(), depositAmount, false)
+
+	// mine block
+	advanceChainByNBlocks(1, anvilC)
+
+	// Register the second operator. Recall that because we are running anvil in FIFO mode
+	// this transaction will be included before the call to UpdateStakesOfOperatorSubsetForAllQuorums
+	registerOperatorWithAvs(operator2Wallet, anvilHttpEndpoint, contractAddresses, operator2EcdsaPrivKeyHex, operator2BlsPrivKey, false)
+
+	// Start the sync
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	go c.avsSync.Start(ctx)
+
+	// Mine another block to include operator2's registration
+	advanceChainByNBlocks(1, anvilC)
+
+	// Wait for sync process to complete
+	time.Sleep(2 * time.Second)
+
+	// Verify the final state
+	operators, err := c.avsReader.GetOperatorAddrsInQuorumsAtCurrentBlock(
+		&bind.CallOpts{},
+		[]types.QuorumNum{0},
+	)
+	require.NoError(t, err)
+
+	// We expect both operators to be registered
+	require.Len(t, operators[0], 2, "Expected both operators to be registered")
+
+	// Verify each operator is in the set
+	operatorAddrs := make(map[common.Address]bool)
+	for _, op := range operators[0] {
+		operatorAddrs[op] = true
+	}
+
+	require.True(t, operatorAddrs[operator1Addr], "Operator 1 should be registered")
+	require.True(t, operatorAddrs[operator2Addr], "Operator 2 should be registered")
+
+	// get stake of operator after sync
+	operatorsPerQuorumAfterSync, err := c.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	operatorStakeAfterSync := operatorsPerQuorumAfterSync[0][0].Stake
+
+	// we check that the stake before and after the sync are the same despite the deposit happening
+	if operatorStakeBeforeSync.Cmp(operatorStakeAfterSync) != 0 {
+		fmt.Printf("%v", operatorStakeAfterSync)
+		fmt.Printf("%v", depositAmount)
+		t.Errorf("expected operator stake before and after sync to be equal, got operatorStakeBeforeSync %v operatorStakeAfterSync %v ", operatorStakeBeforeSync, operatorStakeAfterSync)
+	}
+
+}
+
 // here we test the case where we call avsSync without a list of operators
 // although the operator set here consists of a single operator, the code path is different
 // we force a retry by making the first updateOperator call faill
 // this would for eg happen if an operator registered between the moment we read the operator set and the moment we try to update the operator set
 // since the contract makes sure we are updating the full operator set
-// we can't test for correct stake updates in the contract here because we use a mock writer in order to force the retries,
-// so the contract state doesn't actually change.
 func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
-
-	/* Start the anvil chain */
-	anvilC := startAnvilTestContainer()
-	// Not sure why but deferring anvilC.Terminate() causes a panic when the test finishes...
-	// so letting it terminate silently for now
+	/* Start the anvil chain with no mining and FIFO transaction ordering to be able to force retries */
+	anvilC := startAnvilTestContainer("--order", "fifo", "--no-mining")
 	anvilHttpEndpoint, err := anvilC.Endpoint(context.Background(), "http")
+	require.NoError(t, err)
+
+	contractAddresses := getContractAddressesFromContractRegistry(anvilHttpEndpoint)
+
+	ethClient, err := ethclient.Dial(anvilHttpEndpoint)
+	require.NoError(t, err)
+
+	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{}, 0)
+	c.avsSync.RetrySyncNTimes = 2
+
+	operator1EcdsaPrivKeyHex := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+	operator1Addr := crypto.PubkeyToAddress(crypto.ToECDSAUnsafe(common.FromHex(operator1EcdsaPrivKeyHex)).PublicKey)
+	operator1BlsPrivKey := "0x1"
+
+	operator2EcdsaPrivKeyHex := "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+	operator2BlsPrivKey := "0x2"
+	operator2Addr := crypto.PubkeyToAddress(crypto.ToECDSAUnsafe(common.FromHex(operator2EcdsaPrivKeyHex)).PublicKey)
+	operator2Wallet := createWalletForOperator(t, operator2EcdsaPrivKeyHex, ethClient)
+
+	// Register first operator
+	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operator1EcdsaPrivKeyHex, operator1BlsPrivKey, false)
+
+	// mine block
+	advanceChainByNBlocks(1, anvilC)
+
+	// get state pre sync
+	operatorsPerQuorumBeforeSync, err := c.avsSync.AvsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	contractAddresses := getContractAddressesFromContractRegistry(anvilHttpEndpoint)
-	operatorEcdsaPrivKeyHex := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-	operatorBlsPrivKey := "0x1"
-	// we create avs sync and replace its avsWriter with a mock that will fail the first 2 times we call UpdateStakesOfEntireOperatorSetForQuorums
-	// and succeed on the third time
-	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{}, 0)
-	avsSync := c.avsSync
+	operatorStakeBeforeSync := operatorsPerQuorumBeforeSync[0][0].Stake
 
-	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
-	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
+	// deposit into strategy to create a diff between eigenlayer and avs stakes
+	depositAmount := big.NewInt(100)
+	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operator1EcdsaPrivKeyHex, operator1Addr.Hex(), depositAmount, false)
+	advanceChainByNBlocks(1, anvilC)
 
-	// mockCtrl := gomock.NewController(t)
-	// mockAvsRegistryWriter := chainiomocks.NewMockAvsRegistryWriter(mockCtrl)
-	// // this is the test. we just make sure this is called 3 times
-	// mockAvsRegistryWriter.EXPECT().UpdateStakesOfEntireOperatorSetForQuorums(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("error")).Times(2)
-	// mockAvsRegistryWriter.EXPECT().UpdateStakesOfEntireOperatorSetForQuorums(gomock.Any(), gomock.Any(), gomock.Any()).Return(&gethtypes.Receipt{Status: gethtypes.ReceiptStatusSuccessful}, nil)
-	// avsSync.AvsWriter = mockAvsRegistryWriter
-	// avsSync.RetrySyncNTimes = 3
+	// Register the second operator. Recall that because we are running anvil in FIFO mode
+	// this transaction will be included before the call to UpdateStakesOfOperatorSubsetForAllQuorums
+	registerOperatorWithAvs(operator2Wallet, anvilHttpEndpoint, contractAddresses, operator2EcdsaPrivKeyHex, operator2BlsPrivKey, false)
 
-	// run avsSync
+	// Start the sync
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	avsSync.Start(ctx)
+	go c.avsSync.Start(ctx)
+
+	// Mine another block to include operator2's registration then wait for update
+	advanceChainByNBlocks(1, anvilC)
+	time.Sleep(1 * time.Second)
+
+	// Mine Block to include update
+	advanceChainByNBlocks(1, anvilC)
+
+	// Wait for sync process to complete
+	time.Sleep(10 * time.Second)
+
+	// Verify the final state
+	operators, err := c.avsReader.GetOperatorAddrsInQuorumsAtCurrentBlock(
+		&bind.CallOpts{},
+		[]types.QuorumNum{0},
+	)
+	require.NoError(t, err)
+
+	// We expect both operators to be registered
+	require.Len(t, operators[0], 2, "Expected both operators to be registered")
+
+	// Verify each operator is in the set
+	operatorAddrs := make(map[common.Address]bool)
+	for _, op := range operators[0] {
+		operatorAddrs[op] = true
+	}
+
+	require.True(t, operatorAddrs[operator1Addr], "Operator 1 should be registered")
+	require.True(t, operatorAddrs[operator2Addr], "Operator 2 should be registered")
+
+	// get stake of operator after sync
+	operatorsPerQuorumAfterSync, err := c.avsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	operatorStakeAfterSync := operatorsPerQuorumAfterSync[0][0].Stake
+	operatorStakeDiff := new(big.Int).Sub(operatorStakeAfterSync, operatorStakeBeforeSync)
+
+	fmt.Printf("Stake before sync: %v\n", operatorStakeBeforeSync)
+	fmt.Printf("Stake after sync: %v\n", operatorStakeAfterSync)
+
+	// we just check that the diff is equal to the deposited amount
+	if operatorStakeDiff.Cmp(depositAmount) != 0 {
+		t.Errorf("expected operator stake diff to be equal to deposit amount, got %v", operatorStakeDiff)
+	}
+
+}
+
+// Helper function to create a wallet for an operator
+func createWalletForOperator(t *testing.T, privKeyHex string, ethClient *ethclient.Client) walletsdk.Wallet {
+	logger, err := logging.NewZapLogger(logging.Development)
+	if err != nil {
+		panic(err)
+	}
+
+	ecdsaPrivKey, err := crypto.HexToECDSA(privKeyHex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ecdsaAddr := crypto.PubkeyToAddress(ecdsaPrivKey.PublicKey)
+
+	chainID, err := ethClient.ChainID(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	signerFn, _, err := signerv2.SignerFromConfig(signerv2.Config{
+		PrivateKey: ecdsaPrivKey,
+	}, chainID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wallet, err := walletsdk.NewPrivateKeyWallet(ethClient, signerFn, ecdsaAddr, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return wallet
 }
 
 func TestIntegrationFullOperatorSet(t *testing.T) {
@@ -167,7 +355,7 @@ func TestIntegrationFullOperatorSet(t *testing.T) {
 	avsSync := c.avsSync
 
 	// first register operator into avs. at this point, the operator will have whatever stake it had registered in eigenlayer in the avs
-	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey)
+	registerOperatorWithAvs(c.wallet, anvilHttpEndpoint, contractAddresses, operatorEcdsaPrivKeyHex, operatorBlsPrivKey, true)
 
 	// get stake of operator before sync
 	operatorsPerQuorumBeforeSync, err := avsSync.AvsReader.GetOperatorsStakeInQuorumsAtCurrentBlock(&bind.CallOpts{}, []types.QuorumNum{0})
@@ -179,7 +367,7 @@ func TestIntegrationFullOperatorSet(t *testing.T) {
 
 	// deposit into strategy to create a diff between eigenlayer and avs stakes
 	depositAmount := big.NewInt(100)
-	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount)
+	depositErc20IntoStrategyForOperator(c.wallet, anvilHttpEndpoint, contractAddresses.DelegationManager, contractAddresses.Erc20MockStrategy, operatorEcdsaPrivKeyHex, operatorAddr.Hex(), depositAmount, true)
 
 	avsSync.Start(context.Background())
 
@@ -265,8 +453,8 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 
 	avsSync := avssync.NewAvsSync(
 		logger,
-		avsReader,
-		avsWriter,
+		*avsReader,
+		*avsWriter,
 		0*time.Second,
 		syncInterval,
 		operators,
@@ -287,11 +475,18 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 	}
 }
 
-func startAnvilTestContainer() testcontainers.Container {
+func startAnvilTestContainer(additionalFlags ...string) testcontainers.Container {
 	integrationDir, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
+
+	cmdArgs := []string{
+		"--host", "0.0.0.0",
+		"--load-state", "/root/.anvil/state.json",
+	}
+
+	cmdArgs = append(cmdArgs, additionalFlags...)
 
 	ctx := context.Background()
 	req := testcontainers.ContainerRequest{
@@ -305,7 +500,7 @@ func startAnvilTestContainer() testcontainers.Container {
 			},
 		},
 		Entrypoint:   []string{"anvil"},
-		Cmd:          []string{"--host", "0.0.0.0", "--load-state", "/root/.anvil/state.json"},
+		Cmd:          cmdArgs,
 		ExposedPorts: []string{"8545/tcp"},
 		WaitingFor:   wait.ForLog("Listening on"),
 	}
@@ -316,6 +511,7 @@ func startAnvilTestContainer() testcontainers.Container {
 	if err != nil {
 		panic(err)
 	}
+
 	// this is needed temporarily because anvil restarts at 0 block when we load a state...
 	// see comment in start-anvil-chain-with-el-and-avs-deployed.sh
 	// 25 is arbitrary, but I think it's enough (not sure at which block exactly deployment happened)
@@ -345,7 +541,7 @@ func advanceChainByNBlocks(n int, anvilC testcontainers.Container) {
 }
 
 // TODO(samlaf): move this function to eigensdk
-func registerOperatorWithAvs(wallet walletsdk.Wallet, ethHttpUrl string, contractAddresses ContractAddresses, ecdsaPrivKeyHex string, blsPrivKeyHex string) {
+func registerOperatorWithAvs(wallet walletsdk.Wallet, ethHttpUrl string, contractAddresses ContractAddresses, ecdsaPrivKeyHex string, blsPrivKeyHex string, waitForMine bool) {
 	ethHttpClient, err := NewEthHttpClient(ethHttpUrl)
 	if err != nil {
 		panic(err)
@@ -393,7 +589,7 @@ func registerOperatorWithAvs(wallet walletsdk.Wallet, ethHttpUrl string, contrac
 	_, err = avsWriter.RegisterOperatorInQuorumWithAVSRegistryCoordinator(
 		context.Background(),
 		ecdsaPrivKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry,
-		blsKeyPair, quorumNumbers, socket, true,
+		blsKeyPair, quorumNumbers, socket, waitForMine,
 	)
 	if err != nil {
 		panic(err)
@@ -409,6 +605,7 @@ func depositErc20IntoStrategyForOperator(
 	ecdsaPrivKeyHex string,
 	operatorAddressHex string,
 	amount *big.Int,
+	waitForMined bool,
 ) {
 	ethHttpClient, err := NewEthHttpClient(ethHttpUrl)
 	if err != nil {
@@ -439,7 +636,7 @@ func depositErc20IntoStrategyForOperator(
 		panic(err)
 	}
 
-	_, err = elWriter.DepositERC20IntoStrategy(context.Background(), erc20MockStrategyAddr, amount, true)
+	_, err = elWriter.DepositERC20IntoStrategy(context.Background(), erc20MockStrategyAddr, amount, waitForMined)
 	if err != nil {
 		panic(err)
 	}

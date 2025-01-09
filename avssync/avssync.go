@@ -16,8 +16,8 @@ import (
 )
 
 type AvsSync struct {
-	AvsReader       *avsregistry.ChainReader
-	AvsWriter       *avsregistry.ChainWriter
+	AvsReader       avsregistry.ChainReader
+	AvsWriter       avsregistry.ChainWriter
 	RetrySyncNTimes int
 
 	logger                       sdklogging.Logger
@@ -40,7 +40,7 @@ type AvsSync struct {
 //	fetchQuorumsDynamically - if true, fetch the list of quorums registered in the contract and update all of them (only needed if operators is not empty)
 func NewAvsSync(
 	logger sdklogging.Logger,
-	avsReader *avsregistry.ChainReader, avsWriter *avsregistry.ChainWriter,
+	avsReader avsregistry.ChainReader, avsWriter avsregistry.ChainWriter,
 	sleepBeforeFirstSyncDuration time.Duration, syncInterval time.Duration, operators []common.Address,
 	quorums []byte, fetchQuorumsDynamically bool, retrySyncNTimes int,
 	readerTimeoutDuration time.Duration, writerTimeoutDuration time.Duration,
