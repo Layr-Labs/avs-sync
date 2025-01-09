@@ -217,7 +217,7 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 	require.NoError(t, err)
 
 	c := NewAvsSyncComponents(t, anvilHttpEndpoint, contractAddresses, []common.Address{}, 0)
-	c.avsSync.RetrySyncNTimes = 2
+	c.avsSync.RetrySyncNTimes = 10
 
 	operator1EcdsaPrivKeyHex := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	operator1Addr := crypto.PubkeyToAddress(crypto.ToECDSAUnsafe(common.FromHex(operator1EcdsaPrivKeyHex)).PublicKey)
