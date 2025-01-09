@@ -258,7 +258,7 @@ func TestIntegrationFullOperatorSetWithRetry(t *testing.T) {
 
 	// Mine another block to include operator2's registration then wait for update
 	advanceChainByNBlocks(1, anvilC)
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	// Mine Block to include update
 	advanceChainByNBlocks(1, anvilC)
