@@ -410,8 +410,8 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 
 	avsSync := avssync.NewAvsSync(
 		logger,
-		*avsReader,
-		*avsWriter,
+		avsReader,
+		avsWriter,
 		0*time.Second,
 		syncInterval,
 		operators,

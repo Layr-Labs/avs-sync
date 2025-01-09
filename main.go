@@ -222,8 +222,8 @@ func avsSyncMain(cliCtx *cli.Context) error {
 
 	avsSync := avssync.NewAvsSync(
 		logger,
-		*avsReader,
-		*avsWriter,
+		avsReader,
+		avsWriter,
 		sleepBeforeFirstSyncDuration,
 		cliCtx.Duration(SyncIntervalFlag.Name),
 		operators,
