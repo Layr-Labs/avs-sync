@@ -364,8 +364,7 @@ type AvsSyncComponents struct {
 }
 
 func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddresses ContractAddresses, operators []common.Address, syncInterval time.Duration) *AvsSyncComponents {
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
+	logger := getTestLogger(t)
 	ecdsaPrivKey, err := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
 	require.NoError(t, err)
 	ecdsaAddr := crypto.PubkeyToAddress(ecdsaPrivKey.PublicKey)
@@ -547,8 +546,7 @@ func depositErc20IntoStrategyForOperator(
 	require.NoError(t, err)
 	ecdsaAddr := crypto.PubkeyToAddress(ecdsaPrivKey.PublicKey)
 
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
+	logger := getTestLogger(t)
 	noopMetrics := metrics.NewNoopMetrics()
 
 	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, ecdsaAddr)
@@ -591,8 +589,7 @@ func getContractAddressesFromContractRegistry(t *testing.T, ethHttpUrl string) C
 }
 
 func createWalletForOperator(t *testing.T, privKeyHex string, ethClient *ethclient.Client) walletsdk.Wallet {
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
+	logger := getTestLogger(t)
 
 	ecdsaPrivKey, err := crypto.HexToECDSA(privKeyHex)
 	if err != nil {
@@ -616,4 +613,12 @@ func createWalletForOperator(t *testing.T, privKeyHex string, ethClient *ethclie
 	}
 
 	return wallet
+}
+
+func getTestLogger(t *testing.T) logging.Logger {
+	cfg := DefaultLoggerConfig()
+	cfg.Format = TextLogFormat // Better for test output
+	logger, err := NewLogger(cfg)
+	require.NoError(t, err)
+	return logger
 }
