@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/fireblocks"
 	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/chainio/txmgr"
+	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"github.com/Layr-Labs/eigensdk-go/signerv2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -23,10 +24,14 @@ import (
 	"github.com/urfave/cli"
 )
 
+const (
+	AppName = "AvsSync"
+)
+
 func main() {
 	app := cli.NewApp()
 	app.Flags = Flags
-	app.Name = "AvsSync"
+	app.Name = AppName
 	app.Usage = "Updates stakes of operators"
 	app.Description = "Service that runs a cron job which updates the stakes of the specified operators for the specified AVS' stake registry"
 
@@ -52,7 +57,12 @@ func avsSyncMain(cliCtx *cli.Context) error {
 	writerTimeout := cliCtx.Duration(WriterTimeoutDurationFlag.Name)
 	readerTimeout := cliCtx.Duration(ReaderTimeoutDurationFlag.Name)
 
-	ethHttpClient, err := eth.NewClient(cliCtx.String(EthHttpUrlFlag.Name))
+	// Create new prometheus registry
+	reg := prometheus.NewRegistry()
+
+	rpcCollector := rpccalls.NewCollector(AppName, reg)
+
+	ethHttpClient, err := eth.NewInstrumentedClient(cliCtx.String(EthHttpUrlFlag.Name), rpcCollector)
 	if err != nil {
 		logger.Fatalf("Cannot create eth client", "err", err)
 	}
@@ -209,9 +219,6 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		sleepBeforeFirstSyncDuration = firstSyncTime.Sub(now)
 	}
 	logger.Infof("Sleeping for %v before first sync, so that it happens at %v", sleepBeforeFirstSyncDuration, time.Now().Add(sleepBeforeFirstSyncDuration))
-
-	// Create new prometheus registry
-	reg := prometheus.NewRegistry()
 
 	avsSync := avssync.NewAvsSync(
 		logger,
