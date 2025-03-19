@@ -171,19 +171,25 @@ func avsSyncMain(cliCtx *cli.Context) error {
 	logger.Infof("Sender address: %s", sender.Hex())
 	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, sender)
 
-	avsWriter, err := avsregistry.BuildAvsRegistryChainWriter(
-		common.HexToAddress(cliCtx.String(RegistryCoordinatorAddrFlag.Name)),
-		common.HexToAddress(cliCtx.String(OperatorStateRetrieverAddrFlag.Name)),
-		logger,
+	avsWriter, err := avsregistry.NewWriterFromConfig(
+		avsregistry.Config{
+			RegistryCoordinatorAddress:    common.HexToAddress(cliCtx.String(RegistryCoordinatorAddrFlag.Name)),
+			OperatorStateRetrieverAddress: common.HexToAddress(cliCtx.String(OperatorStateRetrieverAddrFlag.Name)),
+			DontUseAllocationManager:      true,
+		},
 		ethHttpClient,
 		txMgr,
+		logger,
 	)
 	if err != nil {
 		logger.Fatalf("Cannot create avs writer", "err", err)
 	}
-	avsReader, err := avsregistry.BuildAvsRegistryChainReader(
-		common.HexToAddress(cliCtx.String(RegistryCoordinatorAddrFlag.Name)),
-		common.HexToAddress(cliCtx.String(OperatorStateRetrieverAddrFlag.Name)),
+	avsReader, err := avsregistry.NewReaderFromConfig(
+		avsregistry.Config{
+			RegistryCoordinatorAddress:    common.HexToAddress(cliCtx.String(RegistryCoordinatorAddrFlag.Name)),
+			OperatorStateRetrieverAddress: common.HexToAddress(cliCtx.String(OperatorStateRetrieverAddrFlag.Name)),
+			DontUseAllocationManager:      true,
+		},
 		ethHttpClient,
 		logger,
 	)
