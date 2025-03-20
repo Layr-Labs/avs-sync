@@ -22,6 +22,17 @@ var (
 		Usage:    "AVS Operator state retriever address",
 		EnvVar:   envVarPrefix + "OPERATOR_STATE_RETRIEVER_ADDR",
 	}
+	ServiceManagerAddrFlag = cli.StringFlag{
+		Name:     "service-manager-addr",
+		Required: true,
+		Usage:    "AVS Service Manager address",
+		EnvVar:   envVarPrefix + "SERVICE_MANAGER_ADDR",
+	}
+	DontUseAllocationManagerFlag = cli.BoolFlag{
+		Name:   "dont-use-allocation-manager",
+		Usage:  "If set to true, will not use the allocation manager",
+		EnvVar: envVarPrefix + "DONT_USE_ALLOCATION_MANAGER",
+	}
 	EthHttpUrlFlag = cli.StringFlag{
 		Name:     "eth-http-url",
 		Required: true,
@@ -139,6 +150,8 @@ var (
 var RequiredFlags = []cli.Flag{
 	RegistryCoordinatorAddrFlag,
 	OperatorStateRetrieverAddrFlag,
+	ServiceManagerAddrFlag,
+	DontUseAllocationManagerFlag,
 	EthHttpUrlFlag,
 	SyncIntervalFlag,
 }

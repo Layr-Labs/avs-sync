@@ -39,6 +39,8 @@ docker run github.com/layr-labs/avs-sync \
    --eth-http-url http://localhost:8545 \
    --registry-coordinator-addr 0x5FbDB2315678afecb367f032d93F642f64180aa3 \
    --operator-state-retriever-addr 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 \
+   --service-manager-addr 0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E \
+   --dont-use-allocation-manager true \
    --sync-interval 24h
 ```
 

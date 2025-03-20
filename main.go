@@ -175,7 +175,9 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		avsregistry.Config{
 			RegistryCoordinatorAddress:    common.HexToAddress(cliCtx.String(RegistryCoordinatorAddrFlag.Name)),
 			OperatorStateRetrieverAddress: common.HexToAddress(cliCtx.String(OperatorStateRetrieverAddrFlag.Name)),
-			DontUseAllocationManager:      true,
+			DontUseAllocationManager:      cliCtx.Bool(DontUseAllocationManagerFlag.Name),
+
+			ServiceManagerAddress: common.HexToAddress(cliCtx.String(ServiceManagerAddrFlag.Name)),
 		},
 		ethHttpClient,
 		txMgr,
@@ -188,7 +190,9 @@ func avsSyncMain(cliCtx *cli.Context) error {
 		avsregistry.Config{
 			RegistryCoordinatorAddress:    common.HexToAddress(cliCtx.String(RegistryCoordinatorAddrFlag.Name)),
 			OperatorStateRetrieverAddress: common.HexToAddress(cliCtx.String(OperatorStateRetrieverAddrFlag.Name)),
-			DontUseAllocationManager:      true,
+			DontUseAllocationManager:      cliCtx.Bool(DontUseAllocationManagerFlag.Name),
+
+			ServiceManagerAddress: common.HexToAddress(cliCtx.String(ServiceManagerAddrFlag.Name)),
 		},
 		ethHttpClient,
 		logger,
