@@ -29,8 +29,10 @@ var (
 		EnvVar:   envVarPrefix + "SERVICE_MANAGER_ADDR",
 	}
 	DontUseAllocationManagerFlag = cli.BoolFlag{
-		Name:   "dont-use-allocation-manager",
-		Usage:  "If set to true, will not use the allocation manager",
+		Name: "dont-use-allocation-manager",
+		Usage: "If set to true, does not use the AllocationManager core contract to handle operator registration/deregistration and stake allocation/deallocation." +
+			"Only set this to true if you are using the legacy AVSDirectory core contract system. For new deployments not utilizing the M2 flows and AVSs implementing slashing, " +
+			"this should remain false to enable proper functionality.",
 		EnvVar: envVarPrefix + "DONT_USE_ALLOCATION_MANAGER",
 	}
 	EthHttpUrlFlag = cli.StringFlag{
