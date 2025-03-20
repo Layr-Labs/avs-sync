@@ -526,13 +526,7 @@ func registerOperatorWithAvs(t *testing.T, wallet walletsdk.Wallet, ethHttpUrl s
 
 	quorumNumbers := []types.QuorumNum{0}
 	socket := "Not Needed"
-	// operatorToAvsRegistrationSigSalt := [32]byte{123}
-	// curBlockNum, err := ethHttpClient.BlockNumber(context.Background())
-	// require.NoError(t, err)
-	// curBlock, err := ethHttpClient.BlockByNumber(context.Background(), big.NewInt(int64(curBlockNum)))
-	// require.NoError(t, err)
-	// sigValidForSeconds := int64(1_000_000)
-	// operatorToAvsRegistrationSigExpiry := big.NewInt(int64(curBlock.Time()) + sigValidForSeconds)
+
 	_, err = avsWriter.RegisterOperator(
 		context.Background(),
 		ecdsaPrivKey,
