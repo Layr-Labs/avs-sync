@@ -22,6 +22,18 @@ var (
 		Usage:    "AVS Operator state retriever address",
 		EnvVar:   envVarPrefix + "OPERATOR_STATE_RETRIEVER_ADDR",
 	}
+	ServiceManagerAddrFlag = cli.StringFlag{
+		Name:     "service-manager-addr",
+		Required: true,
+		Usage:    "AVS Service Manager address",
+		EnvVar:   envVarPrefix + "SERVICE_MANAGER_ADDR",
+	}
+	DontUseAllocationManagerFlag = cli.BoolFlag{
+		Name: "dont-use-allocation-manager",
+		Usage: "Prevents calls to DelegationManager.allocationManager in the eigensdk-go chainio client constructors, which would fail if AllocationManager doesn't exist. " +
+			"This flag should be set to true when using EigenLayer deployments that are pre-slashing upgrade and false for slashing enabled deployments",
+		EnvVar: envVarPrefix + "DONT_USE_ALLOCATION_MANAGER",
+	}
 	EthHttpUrlFlag = cli.StringFlag{
 		Name:     "eth-http-url",
 		Required: true,
@@ -139,6 +151,8 @@ var (
 var RequiredFlags = []cli.Flag{
 	RegistryCoordinatorAddrFlag,
 	OperatorStateRetrieverAddrFlag,
+	ServiceManagerAddrFlag,
+	DontUseAllocationManagerFlag,
 	EthHttpUrlFlag,
 	SyncIntervalFlag,
 }

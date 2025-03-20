@@ -41,6 +41,7 @@ type ContractAddresses struct {
 	OperatorStateRetriever common.Address
 	DelegationManager      common.Address
 	Erc20MockStrategy      common.Address
+	ServiceManager         common.Address
 }
 
 // there are 2 ways to call avsSync, either with a list of operators (meant to be run by operator teams)
@@ -389,17 +390,25 @@ func NewAvsSyncComponents(t *testing.T, anvilHttpEndpoint string, contractAddres
 
 	txMgr := txmgr.NewSimpleTxManager(wallet, ethInstrumentedHttpClient, logger, ecdsaAddr)
 
-	avsWriter, err := avsregistry.BuildAvsRegistryChainWriter(
-		contractAddresses.RegistryCoordinator,
-		contractAddresses.OperatorStateRetriever,
-		logger,
+	avsWriter, err := avsregistry.NewWriterFromConfig(
+		avsregistry.Config{
+			RegistryCoordinatorAddress:    contractAddresses.RegistryCoordinator,
+			OperatorStateRetrieverAddress: contractAddresses.OperatorStateRetriever,
+			DontUseAllocationManager:      true,
+			ServiceManagerAddress:         contractAddresses.ServiceManager,
+		},
 		ethInstrumentedHttpClient,
 		txMgr,
+		logger,
 	)
 	require.NoError(t, err)
-	avsReader, err := avsregistry.BuildAvsRegistryChainReader(
-		contractAddresses.RegistryCoordinator,
-		contractAddresses.OperatorStateRetriever,
+	avsReader, err := avsregistry.NewReaderFromConfig(
+		avsregistry.Config{
+			RegistryCoordinatorAddress:    contractAddresses.RegistryCoordinator,
+			OperatorStateRetrieverAddress: contractAddresses.OperatorStateRetriever,
+			DontUseAllocationManager:      true,
+			ServiceManagerAddress:         contractAddresses.ServiceManager,
+		},
 		ethInstrumentedHttpClient,
 		logger,
 	)
@@ -502,28 +511,29 @@ func registerOperatorWithAvs(t *testing.T, wallet walletsdk.Wallet, ethHttpUrl s
 	require.NoError(t, err)
 	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, ecdsaAddr)
 
-	avsWriter, err := avsregistry.BuildAvsRegistryChainWriter(
-		contractAddresses.RegistryCoordinator,
-		contractAddresses.OperatorStateRetriever,
-		logger,
+	avsWriter, err := avsregistry.NewWriterFromConfig(
+		avsregistry.Config{
+			RegistryCoordinatorAddress:    contractAddresses.RegistryCoordinator,
+			OperatorStateRetrieverAddress: contractAddresses.OperatorStateRetriever,
+			ServiceManagerAddress:         contractAddresses.ServiceManager,
+			DontUseAllocationManager:      true,
+		},
 		ethHttpClient,
 		txMgr,
+		logger,
 	)
 	require.NoError(t, err)
 
 	quorumNumbers := []types.QuorumNum{0}
 	socket := "Not Needed"
-	operatorToAvsRegistrationSigSalt := [32]byte{123}
-	curBlockNum, err := ethHttpClient.BlockNumber(context.Background())
-	require.NoError(t, err)
-	curBlock, err := ethHttpClient.BlockByNumber(context.Background(), big.NewInt(int64(curBlockNum)))
-	require.NoError(t, err)
-	sigValidForSeconds := int64(1_000_000)
-	operatorToAvsRegistrationSigExpiry := big.NewInt(int64(curBlock.Time()) + sigValidForSeconds)
-	_, err = avsWriter.RegisterOperatorInQuorumWithAVSRegistryCoordinator(
+
+	_, err = avsWriter.RegisterOperator(
 		context.Background(),
-		ecdsaPrivKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry,
-		blsKeyPair, quorumNumbers, socket, waitForMine,
+		ecdsaPrivKey,
+		blsKeyPair,
+		quorumNumbers,
+		socket,
+		waitForMine,
 	)
 	require.NoError(t, err)
 }
@@ -550,9 +560,11 @@ func depositErc20IntoStrategyForOperator(
 	noopMetrics := metrics.NewNoopMetrics()
 
 	txMgr := txmgr.NewSimpleTxManager(wallet, ethHttpClient, logger, ecdsaAddr)
-	elWriter, err := elcontracts.BuildELChainWriter(
-		delegationManagerAddr,
-		common.Address{}, // avsDirectory not needed so we just pass an empty address
+	elWriter, err := elcontracts.NewWriterFromConfig(
+		elcontracts.Config{
+			DelegationManagerAddress: delegationManagerAddr,
+			DontUseAllocationManager: true,
+		},
 		ethHttpClient,
 		logger,
 		noopMetrics,
@@ -580,11 +592,14 @@ func getContractAddressesFromContractRegistry(t *testing.T, ethHttpUrl string) C
 	require.NoError(t, err)
 	erc20MockStrategyAddr, err := contractsRegistry.Contracts(&bind.CallOpts{}, "erc20MockStrategy")
 	require.NoError(t, err)
+	serviceManagerAddr, err := contractsRegistry.Contracts(&bind.CallOpts{}, "eigencertServiceManager")
+	require.NoError(t, err)
 	return ContractAddresses{
 		RegistryCoordinator:    registryCoordinatorAddr,
 		OperatorStateRetriever: operatorStateRetrieverAddr,
 		DelegationManager:      delegationManagerAddr,
 		Erc20MockStrategy:      erc20MockStrategyAddr,
+		ServiceManager:         serviceManagerAddr,
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli"
@@ -26,7 +27,7 @@ const (
 type LoggerConfig struct {
 	Format       LogFormat
 	OutputWriter io.Writer
-	HandlerOpts  slog.HandlerOptions
+	HandlerOpts  logging.SLoggerOptions
 }
 
 var loggerFlags = []cli.Flag{
@@ -54,9 +55,12 @@ func DefaultLoggerConfig() LoggerConfig {
 	return LoggerConfig{
 		Format:       JSONLogFormat,
 		OutputWriter: os.Stdout,
-		HandlerOpts: slog.HandlerOptions{
-			AddSource: true,
-			Level:     slog.LevelDebug,
+		HandlerOpts: logging.SLoggerOptions{
+			AddSource:   false,
+			Level:       slog.LevelDebug,
+			ReplaceAttr: nil,
+			TimeFormat:  time.StampMilli,
+			NoColor:     false,
 		},
 	}
 }
@@ -93,10 +97,10 @@ func ReadLoggerCLIConfig(ctx *cli.Context) (*LoggerConfig, error) {
 
 func NewLogger(cfg LoggerConfig) (logging.Logger, error) {
 	if cfg.Format == JSONLogFormat {
-		return logging.NewSlogJsonLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
+		return logging.NewJsonSLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
 	}
 	if cfg.Format == TextLogFormat {
-		return logging.NewSlogTextLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
+		return logging.NewTextSLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
 	}
 	return nil, fmt.Errorf("unknown log format: %s", cfg.Format)
 }
