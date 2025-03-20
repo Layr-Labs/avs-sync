@@ -30,9 +30,8 @@ var (
 	}
 	DontUseAllocationManagerFlag = cli.BoolFlag{
 		Name: "dont-use-allocation-manager",
-		Usage: "If set to true, does not use the AllocationManager core contract to handle operator registration/deregistration and stake allocation/deallocation." +
-			"Only set this to true if you are using the legacy AVSDirectory core contract system. For new deployments not utilizing the M2 flows and AVSs implementing slashing, " +
-			"this should remain false to enable proper functionality.",
+		Usage: "Prevents calls to DelegationManager.allocationManager in the eigensdk-go chainio client constructors, which would fail if AllocationManager doesn't exist. " +
+			"This flag should be set to true when using EigenLayer deployments that are pre-slashing upgrade and false for slashing enabled deployments",
 		EnvVar: envVarPrefix + "DONT_USE_ALLOCATION_MANAGER",
 	}
 	EthHttpUrlFlag = cli.StringFlag{
