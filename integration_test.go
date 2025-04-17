@@ -444,22 +444,33 @@ func startAnvilTestContainer(t *testing.T, additionalFlags ...string) testcontai
 	integrationDir, err := os.Getwd()
 	require.NoError(t, err)
 
+	tmpDir, err := os.MkdirTemp("", "anvil-state")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	stateFilePath := filepath.Join(integrationDir, "tests/eigenlayer-eigencert-eigenda-strategies-deployed-operators-registered-with-eigenlayer-anvil-state.json")
+	tmpStatePath := filepath.Join(tmpDir, "state.json")
+	stateData, err := os.ReadFile(stateFilePath)
+	require.NoError(t, err)
+	err = os.WriteFile(tmpStatePath, stateData, 0666)
+	require.NoError(t, err)
+
 	cmdArgs := []string{
 		"--host", "0.0.0.0",
-		"--load-state", "/root/.anvil/state.json",
+		"--load-state", "/data/state.json",
 	}
 
 	cmdArgs = append(cmdArgs, additionalFlags...)
 
 	ctx := context.Background()
 	req := testcontainers.ContainerRequest{
-		Image: "ghcr.io/foundry-rs/foundry:stable@sha256:daeeaaf4383ee0cbfc9f31f079a04ffb0123e49e5f67f2a20b5ce1ac1959a4d6",
+		Image: "ghcr.io/foundry-rs/foundry:stable",
 		Mounts: testcontainers.ContainerMounts{
 			testcontainers.ContainerMount{
 				Source: testcontainers.GenericBindMountSource{
-					HostPath: filepath.Join(integrationDir, "tests/eigenlayer-eigencert-eigenda-strategies-deployed-operators-registered-with-eigenlayer-anvil-state.json"),
+					HostPath: tmpStatePath,
 				},
-				Target: "/root/.anvil/state.json",
+				Target: "/data/state.json",
 			},
 		},
 		Entrypoint:   []string{"anvil"},
